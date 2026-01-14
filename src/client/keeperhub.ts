@@ -13,10 +13,16 @@ import type {
 export class KeeperHubClient {
   private apiKey: string;
   private baseUrl: string;
+  private timeout: number;
 
-  constructor(apiKey: string, baseUrl: string = 'https://app.keeperhub.com') {
+  constructor(
+    apiKey: string,
+    baseUrl: string = 'https://app.keeperhub.com',
+    timeout: number = 30000
+  ) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    this.timeout = timeout;
   }
 
   private async request<T>(
@@ -30,28 +36,57 @@ export class KeeperHubClient {
       ...options.headers,
     };
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        // Failed to parse error response, use default message
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+        // Check content-type before trying to parse JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // Failed to parse error response, use default message
+          }
+        }
+
+        throw new Error(errorMessage);
       }
-      throw new Error(errorMessage);
-    }
 
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return undefined as T;
-    }
+      // Handle 204 No Content
+      if (response.status === 204) {
+        return undefined as T;
+      }
 
-    return response.json();
+      // Check content-type before parsing JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Expected JSON response but got ${contentType}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${this.timeout}ms`);
+      }
+
+      throw error;
+    }
   }
 
   async listWorkflows(params?: ListWorkflowsParams): Promise<Workflow[]> {
