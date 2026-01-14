@@ -1,0 +1,32 @@
+{
+  "name": "keeperhub-mcp",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for KeeperHub workflow automation",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "keeperhub",
+    "workflow",
+    "automation",
+    "blockchain"
+  ],
+  "author": "TechOps Services",
+  "license": "MIT",
+  "packageManager": "pnpm@10.27.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
