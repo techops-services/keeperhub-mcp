@@ -105,7 +105,7 @@ export class KeeperHubClient {
   }
 
   async createWorkflow(params: CreateWorkflowParams): Promise<Workflow> {
-    return this.request<Workflow>('/api/workflows', {
+    return this.request<Workflow>('/api/workflows/create', {
       method: 'POST',
       body: JSON.stringify(params),
     });
@@ -114,7 +114,7 @@ export class KeeperHubClient {
   async updateWorkflow(params: UpdateWorkflowParams): Promise<Workflow> {
     const { workflowId, ...updateData } = params;
     return this.request<Workflow>(`/api/workflows/${workflowId}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(updateData),
     });
   }
