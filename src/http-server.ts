@@ -106,10 +106,9 @@ export function createHTTPServer(config: HTTPServerConfig): express.Application 
     });
 
     try {
+      // Note: connect() calls start() internally, don't call start() separately
       await config.server.connect(transport);
       console.error(`SSE session established: ${transport.sessionId}`);
-
-      await transport.start();
     } catch (error) {
       console.error('Error establishing SSE connection:', error);
       sessions.delete(transport.sessionId);
