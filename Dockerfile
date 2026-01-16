@@ -35,5 +35,8 @@ RUN pnpm install --prod --frozen-lockfile
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
+# Expose port for HTTP mode (optional)
+EXPOSE 3000
+
 # Run the server
 CMD ["node", "dist/index.js"]

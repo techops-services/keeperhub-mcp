@@ -52,8 +52,21 @@ The server requires the following environment variables:
 |----------|-------------|----------|---------|
 | `KEEPERHUB_API_KEY` | Your KeeperHub API key | Yes | - |
 | `KEEPERHUB_API_URL` | KeeperHub API base URL | No | `https://app.keeperhub.com` |
+| `PORT` | Port for HTTP/SSE mode (leave unset for stdio) | No | - |
+| `MCP_API_KEY` | API key for authenticating MCP requests (required if PORT is set) | No | - |
+
+### Transport Modes
+
+The server supports two transport modes:
+
+1. **Stdio Mode (default)**: For local AI clients using stdin/stdout communication
+2. **HTTP/SSE Mode**: For remote AI agents using Server-Sent Events over HTTP
+
+To enable HTTP mode, set the `PORT` environment variable. When running in HTTP mode, you must also set `MCP_API_KEY` for authentication.
 
 ## MCP Client Configuration
+
+### Stdio Mode (Local)
 
 Add this to your MCP client configuration (e.g., Claude Code config):
 
@@ -91,6 +104,49 @@ Or for local development:
     }
   }
 }
+```
+
+### HTTP/SSE Mode (Remote)
+
+For remote AI agents, run the server in HTTP mode:
+
+```bash
+# Using Node.js
+PORT=3000 \
+MCP_API_KEY=your_secure_mcp_key \
+KEEPERHUB_API_KEY=your_keeperhub_key \
+pnpm start
+```
+
+Or using Docker:
+
+```bash
+docker run -p 3000:3000 \
+  -e PORT=3000 \
+  -e MCP_API_KEY=your_secure_mcp_key \
+  -e KEEPERHUB_API_KEY=your_keeperhub_key \
+  keeperhub-mcp
+```
+
+The server will expose the following endpoints:
+
+- `GET /health` - Health check endpoint
+- `GET /sse` - Server-Sent Events endpoint for MCP protocol
+- `POST /message` - Message endpoint for client requests
+
+#### Authentication
+
+All HTTP requests must include an `Authorization` header with a Bearer token:
+
+```bash
+Authorization: Bearer your_secure_mcp_key
+```
+
+#### Example: Test Health Check
+
+```bash
+curl -H "Authorization: Bearer your_secure_mcp_key" \
+  http://localhost:3000/health
 ```
 
 ## Available Tools
@@ -278,6 +334,7 @@ To use this MCP server, you need to generate an API key from the KeeperHub appli
 keeperhub-mcp/
 ├── src/
 │   ├── index.ts              # MCP server entry point
+│   ├── http-server.ts        # HTTP/SSE transport server
 │   ├── tools/
 │   │   ├── index.ts          # Tool exports
 │   │   ├── workflows.ts      # Workflow CRUD tools

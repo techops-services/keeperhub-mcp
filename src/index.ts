@@ -33,16 +33,31 @@ import {
   handleWorkflowsResource,
   handleWorkflowResource,
 } from './resources/index.js';
+import { startHTTPServer } from './http-server.js';
 
-const API_KEY = process.env.KEEPERHUB_API_KEY;
-const API_URL = process.env.KEEPERHUB_API_URL || 'https://app.keeperhub.com';
+const KEEPERHUB_API_KEY = process.env.KEEPERHUB_API_KEY;
+const KEEPERHUB_API_URL = process.env.KEEPERHUB_API_URL || 'https://app.keeperhub.com';
+const MCP_API_KEY = process.env.MCP_API_KEY;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
 
-if (!API_KEY) {
+if (!KEEPERHUB_API_KEY) {
   console.error('Error: KEEPERHUB_API_KEY environment variable is required');
   process.exit(1);
 }
 
-const client = new KeeperHubClient(API_KEY, API_URL);
+if (PORT !== undefined) {
+  if (isNaN(PORT) || PORT < 1 || PORT > 65535) {
+    console.error('Error: PORT must be a valid number between 1 and 65535');
+    process.exit(1);
+  }
+
+  if (!MCP_API_KEY) {
+    console.error('Error: MCP_API_KEY environment variable is required when running in HTTP mode (PORT is set)');
+    process.exit(1);
+  }
+}
+
+const client = new KeeperHubClient(KEEPERHUB_API_KEY, KEEPERHUB_API_URL);
 const server = new Server(
   {
     name: 'keeperhub-mcp',
@@ -322,11 +337,20 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  if (PORT) {
+    startHTTPServer({
+      server,
+      port: PORT,
+      apiKey: MCP_API_KEY!,
+    });
+    console.error(`KeeperHub API URL: ${KEEPERHUB_API_URL}`);
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
 
-  console.error('KeeperHub MCP server running on stdio');
-  console.error(`API URL: ${API_URL}`);
+    console.error('KeeperHub MCP server running on stdio');
+    console.error(`KeeperHub API URL: ${KEEPERHUB_API_URL}`);
+  }
 }
 
 main().catch((error) => {
