@@ -1,3 +1,6 @@
+// Re-export action schemas for reference when creating workflows
+export * from './action-schemas.js';
+
 export interface WorkflowNode {
   id: string;
   type: string;

@@ -44,6 +44,130 @@ export const deleteWorkflowSchema = z.object({
   workflow_id: z.string().describe('The ID of the workflow to delete'),
 });
 
+/**
+ * Field name corrections for common mistakes.
+ * Maps wrong field names to correct ones based on action type.
+ */
+const FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
+  // Condition action
+  Condition: {
+    conditionExpression: 'condition',
+    expression: 'condition',
+  },
+  // HTTP Request action
+  'HTTP Request': {
+    url: 'endpoint',
+    method: 'httpMethod',
+    headers: 'httpHeaders',
+    body: 'httpBody',
+  },
+  // Webhook action
+  'webhook/send-webhook': {
+    url: 'webhookUrl',
+    endpoint: 'webhookUrl',
+    method: 'webhookMethod',
+    headers: 'webhookHeaders',
+    body: 'webhookPayload',
+    payload: 'webhookPayload',
+  },
+  // Discord action
+  'discord/send-message': {
+    message: 'discordMessage',
+    content: 'discordMessage',
+  },
+  // Web3 actions
+  'web3/check-balance': {
+    chainId: 'network',
+  },
+  'web3/check-token-balance': {
+    chainId: 'network',
+  },
+  'web3/transfer-funds': {
+    chainId: 'network',
+    to: 'toAddress',
+  },
+  'web3/transfer-token': {
+    chainId: 'network',
+    to: 'toAddress',
+  },
+  'web3/read-contract': {
+    chainId: 'network',
+    contract: 'contractAddress',
+    function: 'functionName',
+    args: 'functionArgs',
+  },
+  'web3/write-contract': {
+    chainId: 'network',
+    contract: 'contractAddress',
+    function: 'functionName',
+    args: 'functionArgs',
+  },
+};
+
+/**
+ * Normalizes node configs by correcting common field name mistakes.
+ * Returns the corrected nodes and a list of corrections made.
+ */
+function normalizeNodeConfigs(
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
+): {
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined;
+  corrections: string[];
+} {
+  if (!nodes) {
+    return { nodes: undefined, corrections: [] };
+  }
+
+  const corrections: string[] = [];
+
+  const normalizedNodes = nodes.map((node) => {
+    const data = node.data as Record<string, unknown>;
+    const config = data.config as Record<string, unknown> | undefined;
+
+    if (!config) {
+      return node;
+    }
+
+    const actionType = config.actionType as string | undefined;
+    if (!actionType) {
+      return node;
+    }
+
+    const fieldCorrections = FIELD_CORRECTIONS[actionType];
+    if (!fieldCorrections) {
+      return node;
+    }
+
+    const newConfig = { ...config };
+    let hasCorrections = false;
+
+    for (const [wrongField, correctField] of Object.entries(fieldCorrections)) {
+      if (wrongField in newConfig && !(correctField in newConfig)) {
+        newConfig[correctField] = newConfig[wrongField];
+        delete newConfig[wrongField];
+        corrections.push(
+          `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${actionType}`
+        );
+        hasCorrections = true;
+      }
+    }
+
+    if (hasCorrections) {
+      return {
+        ...node,
+        data: {
+          ...data,
+          config: newConfig,
+        },
+      };
+    }
+
+    return node;
+  });
+
+  return { nodes: normalizedNodes, corrections };
+}
+
 export async function handleListWorkflows(
   client: KeeperHubClient,
   args: z.infer<typeof listWorkflowsSchema>
@@ -78,12 +202,24 @@ export async function handleCreateWorkflow(
   client: KeeperHubClient,
   args: z.infer<typeof createWorkflowSchema>
 ) {
-  const workflow = await client.createWorkflow(args);
+  // Normalize node configs to fix common field name mistakes
+  const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(args.nodes);
+
+  const workflow = await client.createWorkflow({
+    ...args,
+    nodes: normalizedNodes,
+  });
+
+  // Include corrections in the response if any were made
+  const responseText = corrections.length > 0
+    ? `Auto-corrected field names:\n${corrections.join('\n')}\n\nWorkflow created:\n${JSON.stringify(workflow, null, 2)}`
+    : JSON.stringify(workflow, null, 2);
+
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(workflow, null, 2),
+        text: responseText,
       },
     ],
   };
@@ -94,15 +230,26 @@ export async function handleUpdateWorkflow(
   args: z.infer<typeof updateWorkflowSchema>
 ) {
   const { workflow_id, ...updateData } = args;
+
+  // Normalize node configs to fix common field name mistakes
+  const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(updateData.nodes);
+
   const workflow = await client.updateWorkflow({
     workflowId: workflow_id,
     ...updateData,
+    nodes: normalizedNodes,
   });
+
+  // Include corrections in the response if any were made
+  const responseText = corrections.length > 0
+    ? `Auto-corrected field names:\n${corrections.join('\n')}\n\nWorkflow updated:\n${JSON.stringify(workflow, null, 2)}`
+    : JSON.stringify(workflow, null, 2);
+
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(workflow, null, 2),
+        text: responseText,
       },
     ],
   };
