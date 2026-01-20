@@ -109,10 +109,10 @@ export interface SendDiscordMessageConfig {
  */
 export interface SendEmailConfig {
   actionType: "sendgrid/send-email";
-  integrationId: string;
-  to: string;
-  subject: string;
-  body: string;
+  integrationId?: string; // Optional - uses KeeperHub default if not provided
+  emailTo: string;
+  emailSubject: string;
+  emailBody: string;
 }
 
 /**
@@ -124,7 +124,7 @@ export interface ManualTriggerConfig {
 
 export interface ScheduleTriggerConfig {
   triggerType: "Schedule";
-  scheduleCron: string; // Cron expression, e.g., "* * * * *" for every minute
+  schedule: string; // Cron expression, e.g., "*/5 * * * *" for every 5 minutes
 }
 
 export interface WebhookTriggerConfig {
@@ -172,6 +172,8 @@ export type TriggerConfig =
  * headers              ->  webhookHeaders (for webhook) or httpHeaders (for HTTP Request)
  * body/payload         ->  webhookPayload (for webhook) or httpBody (for HTTP Request)
  * message              ->  discordMessage (for Discord)
+ * to/subject/body      ->  emailTo/emailSubject/emailBody (for SendGrid)
+ * scheduleCron         ->  schedule (for Schedule trigger)
  * chainId              ->  network (use string, not number)
  */
 
@@ -191,6 +193,22 @@ export type TriggerConfig =
  *     },
  *   },
  *   position: { x: 0, y: 0 },
+ * };
+ * ```
+ */
+
+/**
+ * Edge structure - IMPORTANT: Do NOT use sourceHandle or targetHandle
+ *
+ * KeeperHub nodes use simple handles without IDs. Using sourceHandle
+ * or targetHandle will cause edges to not render.
+ *
+ * ```typescript
+ * const edge = {
+ *   id: "edge-1",
+ *   source: "node-1",
+ *   target: "node-2",
+ *   // Do NOT include: sourceHandle, targetHandle
  * };
  * ```
  */
