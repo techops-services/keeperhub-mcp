@@ -28,6 +28,8 @@ import {
   handleGetExecutionLogs,
   generateWorkflowSchema,
   handleGenerateWorkflow,
+  listActionSchemasSchema,
+  handleListActionSchemas,
 } from './tools/index.js';
 import {
   handleWorkflowsResource,
@@ -39,6 +41,10 @@ const KEEPERHUB_API_KEY = process.env.KEEPERHUB_API_KEY;
 const KEEPERHUB_API_URL = process.env.KEEPERHUB_API_URL || 'https://app.keeperhub.com';
 const MCP_API_KEY = process.env.MCP_API_KEY;
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
+
+// Cloudflare Access credentials (optional)
+const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID;
+const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET;
 
 if (!KEEPERHUB_API_KEY) {
   console.error('Error: KEEPERHUB_API_KEY environment variable is required');
@@ -57,7 +63,12 @@ if (PORT !== undefined) {
   }
 }
 
-const client = new KeeperHubClient(KEEPERHUB_API_KEY, KEEPERHUB_API_URL);
+// Build CF Access config if both credentials are provided
+const cfAccessConfig = CF_ACCESS_CLIENT_ID && CF_ACCESS_CLIENT_SECRET
+  ? { clientId: CF_ACCESS_CLIENT_ID, clientSecret: CF_ACCESS_CLIENT_SECRET }
+  : undefined;
+
+const client = new KeeperHubClient(KEEPERHUB_API_KEY, KEEPERHUB_API_URL, 30000, cfAccessConfig);
 const server = new Server(
   {
     name: 'keeperhub-mcp',
@@ -108,7 +119,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'create_workflow',
-        description: 'Create a new workflow',
+        description: 'Create a new workflow with explicit nodes and edges. This is the DEFAULT method for creating workflows. ALWAYS call list_action_schemas first to get correct actionType values and required field names for each node.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -177,8 +188,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'generate_workflow',
-        description: 'AI-powered workflow generation from natural language',
+        name: 'ai_generate_workflow',
+        description: 'Delegate workflow creation to KeeperHub\'s internal AI service (/api/ai/generate). Only use this when user EXPLICITLY requests "use KeeperHub AI" or "let KeeperHub generate it". For normal workflow creation, use create_workflow with list_action_schemas instead.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -240,6 +251,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['execution_id'],
         },
       },
+      {
+        name: 'list_action_schemas',
+        description: 'List available action types and their required configuration fields. Call this before creating workflows to ensure correct node configuration.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            category: {
+              type: 'string',
+              description: 'Filter by category (e.g., "web3", "discord", "sendgrid", "webhook", "system")',
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -267,7 +291,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const args = deleteWorkflowSchema.parse(request.params.arguments);
         return await handleDeleteWorkflow(client, args);
       }
-      case 'generate_workflow': {
+      case 'ai_generate_workflow': {
         const args = generateWorkflowSchema.parse(request.params.arguments);
         return await handleGenerateWorkflow(client, args);
       }
@@ -282,6 +306,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_execution_logs': {
         const args = getExecutionLogsSchema.parse(request.params.arguments);
         return await handleGetExecutionLogs(client, args);
+      }
+      case 'list_action_schemas': {
+        const args = listActionSchemasSchema.parse(request.params.arguments);
+        return await handleListActionSchemas(args);
       }
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);
