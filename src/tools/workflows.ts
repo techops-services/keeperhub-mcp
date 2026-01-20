@@ -105,6 +105,37 @@ const FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
 };
 
 /**
+ * Validates that all edges reference existing node IDs.
+ * Returns warnings for any orphaned edges.
+ */
+function validateEdges(
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined,
+  edges: z.infer<typeof WorkflowEdgeSchema>[] | undefined
+): string[] {
+  if (!edges || edges.length === 0) {
+    return [];
+  }
+
+  const nodeIds = new Set(nodes?.map((n) => n.id) ?? []);
+  const warnings: string[] = [];
+
+  for (const edge of edges) {
+    if (!nodeIds.has(edge.source)) {
+      warnings.push(
+        `Edge "${edge.id}": source "${edge.source}" does not exist in nodes`
+      );
+    }
+    if (!nodeIds.has(edge.target)) {
+      warnings.push(
+        `Edge "${edge.id}": target "${edge.target}" does not exist in nodes`
+      );
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * Normalizes node configs by correcting common field name mistakes.
  * Returns the corrected nodes and a list of corrections made.
  */
@@ -205,6 +236,19 @@ export async function handleCreateWorkflow(
   // Normalize node configs to fix common field name mistakes
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(args.nodes);
 
+  // Validate edges reference existing nodes
+  const edgeWarnings = validateEdges(normalizedNodes, args.edges);
+  if (edgeWarnings.length > 0) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `ERROR: Invalid edges detected. Please fix before creating workflow:\n${edgeWarnings.join('\n')}\n\nTip: Use get_workflow first to see existing node IDs when updating.`,
+        },
+      ],
+    };
+  }
+
   const workflow = await client.createWorkflow({
     ...args,
     nodes: normalizedNodes,
@@ -233,6 +277,19 @@ export async function handleUpdateWorkflow(
 
   // Normalize node configs to fix common field name mistakes
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(updateData.nodes);
+
+  // Validate edges reference existing nodes
+  const edgeWarnings = validateEdges(normalizedNodes, updateData.edges);
+  if (edgeWarnings.length > 0) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `ERROR: Invalid edges detected. Please fix before updating workflow:\n${edgeWarnings.join('\n')}\n\nTip: Use get_workflow first to see existing node IDs.`,
+        },
+      ],
+    };
+  }
 
   const workflow = await client.updateWorkflow({
     workflowId: workflow_id,
