@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - staging
-      # - main  # Enable after prod infrastructure is created
+      - main
   workflow_dispatch:
 
 name: deploy-keeperhub-mcp
