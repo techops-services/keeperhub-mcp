@@ -21,6 +21,10 @@ RUN pnpm run build
 # Runner stage
 FROM node:22-alpine
 
+LABEL org.opencontainers.image.source="https://github.com/techops-services/keeperhub-mcp"
+LABEL org.opencontainers.image.description="KeeperHub MCP Server - Web3 workflow automation"
+LABEL org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 # Install pnpm
