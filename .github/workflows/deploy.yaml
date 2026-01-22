@@ -18,7 +18,7 @@ jobs:
       ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub-mcp
-      AWS_ECR_NAME: keeperhub-mcp-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: ${{ github.ref == 'refs/heads/main' && 'keeperhub-mcp' || 'keeperhub-mcp-staging' }}
       SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
 
     steps:
