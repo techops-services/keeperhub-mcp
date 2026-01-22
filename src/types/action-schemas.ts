@@ -124,7 +124,9 @@ export interface ManualTriggerConfig {
 
 export interface ScheduleTriggerConfig {
   triggerType: "Schedule";
-  schedule: string; // Cron expression, e.g., "*/5 * * * *" for every 5 minutes
+  /** Cron expression - MUST be "scheduleCron", NOT "schedule" */
+  scheduleCron: string; // e.g., "*/5 * * * *" for every 5 minutes
+  scheduleTimezone?: string; // e.g., "America/New_York"
 }
 
 export interface WebhookTriggerConfig {
@@ -133,9 +135,14 @@ export interface WebhookTriggerConfig {
 
 export interface EventTriggerConfig {
   triggerType: "Event";
-  eventNetwork: string; // Chain ID
-  eventAddress: string; // Contract address to watch
-  eventName: string; // Event name to listen for
+  /** Chain ID - MUST be "network", NOT "eventNetwork" */
+  network: string; // e.g., "11155111" for Sepolia
+  /** Contract address - MUST be "contractAddress", NOT "eventAddress" */
+  contractAddress: string; // Contract address to watch
+  /** Contract ABI - required for event parsing */
+  contractABI: string; // JSON string of the contract ABI
+  /** Event name to listen for */
+  eventName: string; // e.g., "Transfer", "*" for all events
 }
 
 /**
@@ -173,8 +180,15 @@ export type TriggerConfig =
  * body/payload         ->  webhookPayload (for webhook) or httpBody (for HTTP Request)
  * message              ->  discordMessage (for Discord)
  * to/subject/body      ->  emailTo/emailSubject/emailBody (for SendGrid)
- * scheduleCron         ->  schedule (for Schedule trigger)
  * chainId              ->  network (use string, not number)
+ *
+ * TRIGGER FIELD NAMES (these are critical!):
+ * WRONG                    CORRECT
+ * -----                    -------
+ * schedule             ->  scheduleCron (for Schedule trigger)
+ * cron                 ->  scheduleCron (for Schedule trigger)
+ * eventNetwork         ->  network (for Event trigger)
+ * eventAddress         ->  contractAddress (for Event trigger)
  */
 
 /**

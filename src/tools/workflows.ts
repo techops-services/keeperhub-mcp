@@ -113,23 +113,11 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
 };
 
 /**
- * Field name corrections for trigger configs.
- * Maps wrong field names to correct ones based on trigger type.
+ * Trigger field names are documented in schemas.ts via list_action_schemas.
+ * No auto-correction for triggers - LLM should use correct field names from schema:
+ * - Schedule: scheduleCron, scheduleTimezone
+ * - Event: network, contractAddress, contractABI, eventName
  */
-const TRIGGER_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
-  Schedule: {
-    scheduleCron: 'schedule',
-    cron: 'schedule',
-    cronExpression: 'schedule',
-  },
-  Event: {
-    chainId: 'eventNetwork',
-    network: 'eventNetwork',
-    address: 'eventAddress',
-    contractAddress: 'eventAddress',
-    event: 'eventName',
-  },
-};
 
 /**
  * Validates that all edges reference existing node IDs.
@@ -163,9 +151,9 @@ function validateEdges(
 }
 
 /**
- * Normalizes node configs by correcting common field name mistakes.
+ * Normalizes action node configs by correcting common field name mistakes.
  * Returns the corrected nodes and a list of corrections made.
- * Handles both action nodes (actionType) and trigger nodes (triggerType).
+ * Only handles action nodes - trigger nodes should use correct field names from schema.
  */
 function normalizeNodeConfigs(
   nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
@@ -187,23 +175,13 @@ function normalizeNodeConfigs(
       return node;
     }
 
-    // Determine if this is an action or trigger node
+    // Only handle action nodes - triggers should use correct field names from schema
     const actionType = config.actionType as string | undefined;
-    const triggerType = config.triggerType as string | undefined;
-
-    let fieldCorrections: Record<string, string> | undefined;
-    let typeKey: string;
-
-    if (actionType) {
-      fieldCorrections = ACTION_FIELD_CORRECTIONS[actionType];
-      typeKey = actionType;
-    } else if (triggerType) {
-      fieldCorrections = TRIGGER_FIELD_CORRECTIONS[triggerType];
-      typeKey = `trigger:${triggerType}`;
-    } else {
+    if (!actionType) {
       return node;
     }
 
+    const fieldCorrections = ACTION_FIELD_CORRECTIONS[actionType];
     if (!fieldCorrections) {
       return node;
     }
@@ -216,7 +194,7 @@ function normalizeNodeConfigs(
         newConfig[correctField] = newConfig[wrongField];
         delete newConfig[wrongField];
         corrections.push(
-          `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${typeKey}`
+          `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${actionType}`
         );
         hasCorrections = true;
       }
