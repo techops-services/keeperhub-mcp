@@ -184,23 +184,29 @@ const TRIGGER_SCHEMAS = {
     triggerType: 'Schedule',
     description: 'Time-based scheduled trigger',
     requiredFields: {
-      schedule: 'string - Cron expression (e.g., "*/5 * * * *" for every 5 minutes)',
+      scheduleCron: 'string - Cron expression (e.g., "*/5 * * * *" for every 5 minutes)',
     },
-    optionalFields: {},
+    optionalFields: {
+      scheduleTimezone: 'string - Timezone (e.g., "America/New_York")',
+    },
   },
   Webhook: {
     triggerType: 'Webhook',
     description: 'HTTP webhook trigger - workflow is triggered by incoming HTTP request',
     requiredFields: {},
-    optionalFields: {},
+    optionalFields: {
+      webhookSchema: 'string - JSON schema for expected payload',
+      webhookMockRequest: 'string - Sample JSON payload for testing',
+    },
   },
   Event: {
     triggerType: 'Event',
     description: 'Blockchain event trigger - listens for smart contract events',
     requiredFields: {
-      eventNetwork: 'string - Chain ID to listen on',
-      eventAddress: 'string - Contract address to watch',
-      eventName: 'string - Event name to listen for',
+      network: 'string - Chain ID to listen on (e.g., "11155111" for Sepolia)',
+      contractAddress: 'string - Contract address to watch',
+      contractABI: 'string - Contract ABI JSON for event parsing',
+      eventName: 'string - Event name to listen for, or "*" for all events',
     },
     optionalFields: {},
   },
@@ -259,6 +265,7 @@ export async function handleListActionSchemas(
         'Use {{@nodeId:Label.field}} syntax to reference outputs from previous nodes',
         'network should be chain ID as string (e.g., "1" for mainnet, "11155111" for sepolia)',
         'Edges only need id, source, and target - do NOT use sourceHandle or targetHandle',
+        'TRIGGER FIELDS: Use "scheduleCron" (not "schedule"), "network" and "contractAddress" (not "eventNetwork"/"eventAddress")',
       ],
     };
   }
