@@ -22,7 +22,7 @@ ingress:
 
 image:
   repository: ${ECR_REGISTRY}/keeperhub-mcp-prod
-  tag: app-${IMAGE_TAG}
+  tag: ${IMAGE_TAG}
   pullPolicy: Always
 
 deployment:
