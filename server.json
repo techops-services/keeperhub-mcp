@@ -12,23 +12,5 @@
       "type": "sse",
       "url": "https://mcp.keeperhub.com/sse"
     }
-  ],
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "keeperhub-mcp",
-      "version": "1.0.0",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "KEEPERHUB_API_KEY",
-          "description": "Your KeeperHub API key for authentication",
-          "isRequired": true,
-          "isSecret": true
-        }
-      ]
-    }
   ]
 }
