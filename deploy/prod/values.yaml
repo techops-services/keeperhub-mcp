@@ -21,8 +21,8 @@ ingress:
     traefik.ingress.kubernetes.io/router.tls.options: traefik-cloudflare-origin-pull@kubernetescrd
 
 image:
-  repository: ${ECR_REGISTRY}/keeperhub-mcp-prod
-  tag: ${IMAGE_TAG}
+  repository: ${ECR_REGISTRY}/keeperhub-mcp
+  tag: "${IMAGE_TAG}"
   pullPolicy: Always
 
 deployment:

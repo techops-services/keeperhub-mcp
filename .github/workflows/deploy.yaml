@@ -23,7 +23,7 @@ jobs:
       ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub-mcp
-      AWS_ECR_NAME: keeperhub-mcp-${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
+      AWS_ECR_NAME: ${{ github.ref == 'refs/heads/main' && 'keeperhub-mcp' || 'keeperhub-mcp-staging' }}
       SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
 
     steps:
@@ -42,6 +42,17 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        if: ${{ !contains(github.event.head_commit.message, '[skip build]') }}
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         if: ${{ !contains(github.event.head_commit.message, '[skip build]') }}
         uses: docker/setup-buildx-action@v3
@@ -53,18 +64,22 @@ jobs:
         run: |
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - name: Build, tag, and push image to ECR
+      - name: Build, tag, and push image to ECR and GHCR
         id: build-image
         if: ${{ !contains(github.event.head_commit.message, '[skip build]') }}
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:${{ steps.vars.outputs.sha_short }}
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:latest
             ${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:${{ env.ENVIRONMENT_TAG }}
+            ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.sha_short }}
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ env.ENVIRONMENT_TAG }}
           cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache
           cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.AWS_ECR_NAME }}:cache,mode=max
 
