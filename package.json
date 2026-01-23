@@ -2,6 +2,7 @@
   "name": "keeperhub-mcp",
   "version": "1.0.0",
   "description": "Model Context Protocol server for KeeperHub workflow automation",
+  "mcpName": "io.github.techops-services/keeperhub-mcp",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
