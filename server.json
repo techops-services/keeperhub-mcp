@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.techops-services/keeperhub-mcp",
+  "description": "MCP server for KeeperHub that enables AI agents to create, manage, and execute blockchain automation workflows",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techops-services/keeperhub-mcp"
+  },
+  "remotes": {
+    "production": {
+      "transportType": "sse",
+      "url": "https://mcp.keeperhub.com/sse"
+    }
+  },
+  "packages": {
+    "npm": {
+      "name": "keeperhub-mcp"
+    }
+  }
+}
