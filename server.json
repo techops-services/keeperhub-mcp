@@ -13,9 +13,10 @@
       "url": "https://mcp.keeperhub.com/sse"
     }
   ],
-  "packages": {
-    "npm": {
+  "packages": [
+    {
+      "registry": "npm",
       "name": "keeperhub-mcp"
     }
-  }
+  ]
 }
