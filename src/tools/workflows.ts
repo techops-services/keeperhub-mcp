@@ -230,7 +230,8 @@ function autoLayoutNodes(
 }
 
 /**
- * Checks if nodes need auto-layout (missing or overlapping positions).
+ * Checks if nodes need auto-layout (missing, overlapping, or vertical positions).
+ * Workflows should flow left-to-right (horizontal), not top-to-bottom (vertical).
  */
 function needsAutoLayout(nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined): boolean {
   if (!nodes || nodes.length === 0) {
@@ -250,6 +251,18 @@ function needsAutoLayout(nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
 
   // If all nodes are in a single column (same x) or single row (same y) with >2 nodes, re-layout
   if (nodes.length > 2 && (uniqueX.size === 1 || uniqueY.size === 1)) {
+    return true;
+  }
+
+  // Detect vertical layouts (top-to-bottom flow) and convert to horizontal (left-to-right)
+  // Calculate spread in x and y directions
+  const xValues = positions.map((p) => p.x);
+  const yValues = positions.map((p) => p.y);
+  const xSpread = Math.max(...xValues) - Math.min(...xValues);
+  const ySpread = Math.max(...yValues) - Math.min(...yValues);
+
+  // If vertical spread is greater than horizontal spread, it's a vertical layout - re-layout to horizontal
+  if (nodes.length > 1 && ySpread > xSpread) {
     return true;
   }
 
