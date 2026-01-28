@@ -113,11 +113,36 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
 };
 
 /**
- * Trigger field names are documented in schemas.ts via list_action_schemas.
- * No auto-correction for triggers - LLM should use correct field names from schema:
- * - Schedule: scheduleCron, scheduleTimezone
- * - Event: network, contractAddress, contractABI, eventName
+ * Trigger field name corrections for common mistakes.
+ * Maps wrong field names to correct ones based on trigger type.
  */
+const TRIGGER_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
+  // Schedule trigger
+  Schedule: {
+    schedule: 'scheduleCron',
+    cron: 'scheduleCron',
+    cronExpression: 'scheduleCron',
+    timezone: 'scheduleTimezone',
+  },
+  // Event trigger
+  Event: {
+    chainId: 'network',
+    contract: 'contractAddress',
+    abi: 'contractABI',
+    event: 'eventName',
+  },
+};
+
+/**
+ * Correct triggerType capitalization.
+ * The UI expects specific casing for trigger types.
+ */
+const TRIGGER_TYPE_CORRECTIONS: Record<string, string> = {
+  schedule: 'Schedule',
+  manual: 'Manual',
+  webhook: 'Webhook',
+  event: 'Event',
+};
 
 // Layout constants for auto-positioning nodes
 const LAYOUT = {
@@ -352,9 +377,89 @@ function validateConditionNodes(
 }
 
 /**
- * Normalizes action node configs by correcting common field name mistakes.
+ * Ensures nodes have required data fields for the UI to render properly.
+ * The KeeperHub UI requires these fields in node.data:
+ * - type: "trigger" or "action" (tells UI how to render the node)
+ * - status: "idle" (needed for UI state management)
+ * - description: shown under node label in the canvas
+ *
+ * Without these fields, the right-side drawer panel won't appear when clicking nodes.
+ */
+function ensureNodeDataFields(
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
+): z.infer<typeof WorkflowNodeSchema>[] | undefined {
+  if (!nodes) {
+    return undefined;
+  }
+
+  return nodes.map((node) => {
+    const data = node.data as Record<string, unknown>;
+    const config = data.config as Record<string, unknown> | undefined;
+    const label = data.label as string | undefined;
+
+    // Determine node type from node.type field
+    const nodeType = node.type === 'trigger' ? 'trigger' : 'action';
+
+    // Generate default description if missing
+    let description = data.description as string | undefined;
+    if (!description && label) {
+      // Generate a sensible description based on action type or label
+      const actionType = config?.actionType as string | undefined;
+      if (actionType === 'web3/check-balance') {
+        description = `Check wallet ETH balance`;
+      } else if (actionType === 'Condition') {
+        description = `Evaluate condition`;
+      } else if (actionType === 'webhook/send-webhook') {
+        description = `Send webhook request`;
+      } else if (actionType === 'discord/send-message') {
+        description = `Send Discord message`;
+      } else if (actionType === 'sendgrid/send-email') {
+        description = `Send email via SendGrid`;
+      } else if (node.type === 'trigger') {
+        const triggerType = config?.triggerType as string | undefined;
+        if (triggerType === 'Schedule') {
+          description = `Scheduled trigger`;
+        } else if (triggerType === 'Event') {
+          description = `Blockchain event trigger`;
+        } else if (triggerType === 'Webhook') {
+          description = `Webhook trigger`;
+        } else {
+          description = `Manual trigger`;
+        }
+      } else {
+        description = label;
+      }
+    }
+
+    // Only update if fields are missing
+    const needsUpdate =
+      data.type !== nodeType ||
+      data.status === undefined ||
+      (data.description === undefined && description);
+
+    if (!needsUpdate) {
+      return node;
+    }
+
+    return {
+      ...node,
+      data: {
+        ...data,
+        type: nodeType,
+        status: data.status ?? 'idle',
+        ...(description && !data.description ? { description } : {}),
+      },
+    };
+  });
+}
+
+/**
+ * Normalizes node configs by correcting common field name mistakes.
  * Returns the corrected nodes and a list of corrections made.
- * Only handles action nodes - trigger nodes should use correct field names from schema.
+ * Handles both action nodes and trigger nodes:
+ * - Fixes triggerType capitalization (e.g., "schedule" -> "Schedule")
+ * - Fixes trigger field names (e.g., "schedule" -> "scheduleCron")
+ * - Fixes action field names (e.g., "url" -> "webhookUrl")
  */
 function normalizeNodeConfigs(
   nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
@@ -376,28 +481,56 @@ function normalizeNodeConfigs(
       return node;
     }
 
-    // Only handle action nodes - triggers should use correct field names from schema
-    const actionType = config.actionType as string | undefined;
-    if (!actionType) {
-      return node;
-    }
-
-    const fieldCorrections = ACTION_FIELD_CORRECTIONS[actionType];
-    if (!fieldCorrections) {
-      return node;
-    }
-
     const newConfig = { ...config };
     let hasCorrections = false;
 
-    for (const [wrongField, correctField] of Object.entries(fieldCorrections)) {
-      if (wrongField in newConfig && !(correctField in newConfig)) {
-        newConfig[correctField] = newConfig[wrongField];
-        delete newConfig[wrongField];
-        corrections.push(
-          `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${actionType}`
-        );
-        hasCorrections = true;
+    // Handle trigger nodes
+    if (node.type === 'trigger') {
+      const triggerType = config.triggerType as string | undefined;
+      if (triggerType) {
+        // Fix triggerType capitalization (e.g., "schedule" -> "Schedule")
+        const correctedTriggerType = TRIGGER_TYPE_CORRECTIONS[triggerType.toLowerCase()];
+        if (correctedTriggerType && correctedTriggerType !== triggerType) {
+          newConfig.triggerType = correctedTriggerType;
+          corrections.push(
+            `Node "${node.id}": Corrected triggerType "${triggerType}" to "${correctedTriggerType}"`
+          );
+          hasCorrections = true;
+        }
+
+        // Fix trigger field names
+        const normalizedTriggerType = correctedTriggerType ?? triggerType;
+        const fieldCorrections = TRIGGER_FIELD_CORRECTIONS[normalizedTriggerType];
+        if (fieldCorrections) {
+          for (const [wrongField, correctField] of Object.entries(fieldCorrections)) {
+            if (wrongField in newConfig && !(correctField in newConfig)) {
+              newConfig[correctField] = newConfig[wrongField];
+              delete newConfig[wrongField];
+              corrections.push(
+                `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${normalizedTriggerType} trigger`
+              );
+              hasCorrections = true;
+            }
+          }
+        }
+      }
+    }
+
+    // Handle action nodes
+    const actionType = config.actionType as string | undefined;
+    if (actionType) {
+      const fieldCorrections = ACTION_FIELD_CORRECTIONS[actionType];
+      if (fieldCorrections) {
+        for (const [wrongField, correctField] of Object.entries(fieldCorrections)) {
+          if (wrongField in newConfig && !(correctField in newConfig)) {
+            newConfig[correctField] = newConfig[wrongField];
+            delete newConfig[wrongField];
+            corrections.push(
+              `Node "${node.id}": Corrected "${wrongField}" to "${correctField}" for ${actionType}`
+            );
+            hasCorrections = true;
+          }
+        }
       }
     }
 
@@ -463,8 +596,11 @@ export async function handleCreateWorkflow(
   // Normalize node configs to fix common field name mistakes
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(args.nodes);
 
+  // Ensure nodes have required UI fields (type, status, description)
+  const nodesWithUIFields = ensureNodeDataFields(normalizedNodes);
+
   // Validate edges reference existing nodes
-  const edgeWarnings = validateEdges(normalizedNodes, args.edges);
+  const edgeWarnings = validateEdges(nodesWithUIFields, args.edges);
   if (edgeWarnings.length > 0) {
     return {
       content: [
@@ -477,7 +613,7 @@ export async function handleCreateWorkflow(
   }
 
   // Validate Condition node usage
-  const conditionWarnings = validateConditionNodes(normalizedNodes, args.edges);
+  const conditionWarnings = validateConditionNodes(nodesWithUIFields, args.edges);
   if (conditionWarnings.length > 0) {
     return {
       content: [
@@ -490,9 +626,9 @@ export async function handleCreateWorkflow(
   }
 
   // Auto-layout nodes if positions are missing or poorly arranged
-  const layoutedNodes = needsAutoLayout(normalizedNodes)
-    ? autoLayoutNodes(normalizedNodes, args.edges)
-    : normalizedNodes;
+  const layoutedNodes = needsAutoLayout(nodesWithUIFields)
+    ? autoLayoutNodes(nodesWithUIFields, args.edges)
+    : nodesWithUIFields;
 
   const workflow = await client.createWorkflow({
     ...args,
@@ -523,8 +659,11 @@ export async function handleUpdateWorkflow(
   // Normalize node configs to fix common field name mistakes
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(updateData.nodes);
 
+  // Ensure nodes have required UI fields (type, status, description)
+  const nodesWithUIFields = ensureNodeDataFields(normalizedNodes);
+
   // Validate edges reference existing nodes
-  const edgeWarnings = validateEdges(normalizedNodes, updateData.edges);
+  const edgeWarnings = validateEdges(nodesWithUIFields, updateData.edges);
   if (edgeWarnings.length > 0) {
     return {
       content: [
@@ -537,7 +676,7 @@ export async function handleUpdateWorkflow(
   }
 
   // Validate Condition node usage
-  const conditionWarnings = validateConditionNodes(normalizedNodes, updateData.edges);
+  const conditionWarnings = validateConditionNodes(nodesWithUIFields, updateData.edges);
   if (conditionWarnings.length > 0) {
     return {
       content: [
@@ -550,9 +689,9 @@ export async function handleUpdateWorkflow(
   }
 
   // Auto-layout nodes if positions are missing or poorly arranged
-  const layoutedNodes = needsAutoLayout(normalizedNodes)
-    ? autoLayoutNodes(normalizedNodes, updateData.edges)
-    : normalizedNodes;
+  const layoutedNodes = needsAutoLayout(nodesWithUIFields)
+    ? autoLayoutNodes(nodesWithUIFields, updateData.edges)
+    : nodesWithUIFields;
 
   const workflow = await client.updateWorkflow({
     workflowId: workflow_id,
