@@ -12,11 +12,12 @@ const ACTION_SCHEMAS = {
     actions: {
       'Condition': {
         actionType: 'Condition',
-        description: 'Conditional branching based on expression evaluation',
+        description: 'Conditional gate - only continues to connected nodes if condition evaluates to true. For if/else logic, create TWO separate Condition nodes from the same source: one with the condition (e.g., balance < 1) and one with the inverse (e.g., balance >= 1), each leading to different actions.',
         requiredFields: {
           condition: 'string - Expression using {{@nodeId:Label.field}} syntax, e.g., "{{@check-balance:Check Balance.balance}} < 0.1"',
         },
         optionalFields: {},
+        behavior: 'GATE (not branch) - execution only continues if condition is TRUE. No false branch exists.',
       },
       'HTTP Request': {
         actionType: 'HTTP Request',
@@ -293,6 +294,7 @@ export async function handleListActionSchemas(
         'Edges only need id, source, and target - do NOT use sourceHandle or targetHandle',
         'TRIGGER FIELDS: Use "scheduleCron" (not "schedule"), "network" and "contractAddress" (not "eventNetwork"/"eventAddress")',
         'NODE POSITIONS: Positions are optional - nodes will be auto-laid out horizontally (left-to-right) based on edge connections',
+        'CONDITION NODES: Act as gates, NOT branches. For if/else logic, create TWO Condition nodes from the same source with opposite conditions (e.g., "balance < 1" and "balance >= 1"), each leading to different actions.',
       ],
     };
   } else {
