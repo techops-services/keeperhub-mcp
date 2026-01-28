@@ -5,3 +5,4 @@ export * from './schemas.js';
 export * from './plugins.js';
 export * from './templates.js';
 export * from './documentation.js';
+export * from './integrations.js';

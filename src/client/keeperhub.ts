@@ -10,6 +10,8 @@ import type {
   GenerateWorkflowResponse,
   WorkflowNode,
   WorkflowEdge,
+  Integration,
+  ListIntegrationsParams,
 } from '../types/index.js';
 
 type StreamMessage = {
@@ -187,6 +189,16 @@ export class KeeperHubClient {
 
   async getExecutionLogs(executionId: string): Promise<ExecutionLog[]> {
     return this.request<ExecutionLog[]>(`/api/executions/${executionId}/logs`);
+  }
+
+  async listIntegrations(params?: ListIntegrationsParams): Promise<Integration[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.type) queryParams.set('type', params.type);
+
+    const query = queryParams.toString();
+    const path = `/api/integrations${query ? `?${query}` : ''}`;
+
+    return this.request<Integration[]>(path);
   }
 
   async generateWorkflow(params: GenerateWorkflowRequest): Promise<GenerateWorkflowResponse> {

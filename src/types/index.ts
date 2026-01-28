@@ -86,3 +86,31 @@ export interface ExecuteWorkflowParams {
   workflowId: string;
   input?: Record<string, unknown>;
 }
+
+// Integration types
+export type IntegrationType =
+  | 'ai-gateway'
+  | 'clerk'
+  | 'database'
+  | 'discord'
+  | 'linear'
+  | 'resend'
+  | 'sendgrid'
+  | 'slack'
+  | 'v0'
+  | 'web3'
+  | 'webflow'
+  | 'webhook';
+
+export interface Integration {
+  id: string;
+  name: string;
+  type: IntegrationType;
+  isManaged?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListIntegrationsParams {
+  type?: IntegrationType;
+}

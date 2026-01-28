@@ -46,6 +46,10 @@ import {
   handleDeployTemplate,
   toolsDocumentationSchema,
   handleToolsDocumentation,
+  listIntegrationsSchema,
+  getWalletIntegrationSchema,
+  handleListIntegrations,
+  handleGetWalletIntegration,
 } from './tools/index.js';
 import {
   handleWorkflowsResource,
@@ -500,6 +504,43 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: 'list_integrations',
+        description:
+          'List configured integrations for the organization. Filter by type to find specific integrations (e.g., "web3" for wallet integrations).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              enum: [
+                'ai-gateway',
+                'clerk',
+                'database',
+                'discord',
+                'linear',
+                'resend',
+                'sendgrid',
+                'slack',
+                'v0',
+                'web3',
+                'webflow',
+                'webhook',
+              ],
+              description: 'Filter by integration type',
+            },
+          },
+        },
+      },
+      {
+        name: 'get_wallet_integration',
+        description:
+          'Get the wallet integration ID for the organization. Use this to auto-discover the integrationId needed for web3/write-contract and web3/transfer-funds workflow nodes. Each organization typically has one wallet integration.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -580,6 +621,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'tools_documentation': {
         const args = toolsDocumentationSchema.parse(request.params.arguments);
         return await handleToolsDocumentation(args);
+      }
+      case 'list_integrations': {
+        const args = listIntegrationsSchema.parse(request.params.arguments);
+        return await handleListIntegrations(client, args);
+      }
+      case 'get_wallet_integration': {
+        getWalletIntegrationSchema.parse(request.params.arguments);
+        return await handleGetWalletIntegration(client);
       }
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);
