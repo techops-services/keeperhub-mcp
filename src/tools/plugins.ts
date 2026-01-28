@@ -10,6 +10,7 @@ export const searchPluginsSchema = z.object({
 export const getPluginSchema = z.object({
   plugin_type: z.string(),
   include_examples: z.boolean().default(false).optional(),
+  include_config_fields: z.boolean().default(false).optional().describe('Include full configFields/outputFields for each step (default: false, returns step summaries only)'),
 });
 
 export const validatePluginConfigSchema = z.object({
@@ -41,7 +42,7 @@ export async function handleGetPlugin(
   pluginRepo: PluginRepository,
   args: z.infer<typeof getPluginSchema>
 ) {
-  const { plugin_type, include_examples = false } = args;
+  const { plugin_type, include_examples = false, include_config_fields = false } = args;
 
   const plugin = pluginRepo.getPlugin(plugin_type);
 
@@ -57,12 +58,27 @@ export async function handleGetPlugin(
     };
   }
 
-  if (include_examples) {
-    plugin.steps = plugin.steps.map((step: any) => ({
-      ...step,
-      examples: generateStepExamples(plugin_type, step),
-    }));
-  }
+  // Transform steps based on options
+  plugin.steps = plugin.steps.map((step: any) => {
+    let transformedStep = { ...step };
+
+    // Add examples if requested
+    if (include_examples) {
+      transformedStep.examples = generateStepExamples(plugin_type, step);
+    }
+
+    // Strip configFields/outputFields unless requested (return summary only)
+    if (!include_config_fields) {
+      const { configFields, outputFields, ...summary } = transformedStep;
+      transformedStep = {
+        ...summary,
+        configFieldCount: configFields?.length ?? 0,
+        outputFieldCount: outputFields?.length ?? 0,
+      };
+    }
+
+    return transformedStep;
+  });
 
   return {
     content: [
