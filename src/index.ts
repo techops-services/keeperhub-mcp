@@ -312,13 +312,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'list_action_schemas',
-        description: 'List available action types and their required configuration fields. Call this before creating workflows to ensure correct node configuration.',
+        description: 'List available action types and their configuration fields. Returns summaries by default; use category or include_full_schemas for details.',
         inputSchema: {
           type: 'object',
           properties: {
             category: {
               type: 'string',
-              description: 'Filter by category (e.g., "web3", "discord", "sendgrid", "webhook", "system")',
+              description: 'Get full schema for a specific category (e.g., "web3", "discord", "sendgrid", "webhook", "system")',
+            },
+            include_full_schemas: {
+              type: 'boolean',
+              description: 'Include full field definitions for all categories (default: false)',
             },
           },
         },
@@ -350,7 +354,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'get_plugin',
         description:
-          'Get complete documentation for a KeeperHub plugin including all available steps, input/output schemas, and credential requirements.',
+          'Get documentation for a KeeperHub plugin. Returns step summaries by default; use include_config_fields for full schemas.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -361,6 +365,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             include_examples: {
               type: 'boolean',
               description: 'Include configuration examples for each step (default: false)',
+            },
+            include_config_fields: {
+              type: 'boolean',
+              description: 'Include full configFields/outputFields arrays (default: false)',
             },
           },
           required: ['plugin_type'],
@@ -426,7 +434,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'get_template',
         description:
-          'Get complete workflow template configuration including nodes, edges, and setup instructions.',
+          'Get workflow template metadata and setup guide. Use include_workflow_config for full nodes/edges.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -437,6 +445,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             include_setup_guide: {
               type: 'boolean',
               description: 'Include step-by-step setup instructions (default: true)',
+            },
+            include_workflow_config: {
+              type: 'boolean',
+              description: 'Include full nodes/edges arrays (default: false)',
             },
           },
           required: ['template_id'],
@@ -472,18 +484,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'tools_documentation',
         description:
-          'Get comprehensive documentation for KeeperHub MCP tools. Explains all available tools, their parameters, use cases, and best practices.',
+          'Get documentation for KeeperHub MCP tools. Returns tool list by default; specify tool_name for detailed docs.',
         inputSchema: {
           type: 'object',
           properties: {
             tool_name: {
               type: 'string',
-              description: 'Specific tool to document (omit for all tools)',
+              description: 'Specific tool to get detailed documentation for (omit for tool list)',
             },
             format: {
               type: 'string',
               enum: ['essentials', 'full'],
-              description: 'Documentation detail level (default: essentials)',
+              description: 'Documentation detail level when tool_name specified (default: essentials)',
             },
           },
         },

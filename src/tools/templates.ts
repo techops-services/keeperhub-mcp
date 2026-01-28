@@ -18,6 +18,7 @@ export const searchTemplatesSchema = z.object({
 export const getTemplateSchema = z.object({
   template_id: z.string(),
   include_setup_guide: z.boolean().default(true).optional(),
+  include_workflow_config: z.boolean().default(false).optional().describe('Include full nodes/edges arrays (default: false, returns metadata + setup guide only)'),
 });
 
 export const deployTemplateSchema = z.object({
@@ -54,7 +55,7 @@ export async function handleGetTemplate(
   templateRepo: TemplateRepository,
   args: z.infer<typeof getTemplateSchema>
 ) {
-  const { template_id, include_setup_guide = true } = args;
+  const { template_id, include_setup_guide = true, include_workflow_config = false } = args;
 
   const template = templateRepo.getTemplate(template_id);
 
@@ -70,7 +71,20 @@ export async function handleGetTemplate(
     };
   }
 
-  const result: any = { ...template };
+  let result: any;
+
+  if (include_workflow_config) {
+    // Include full nodes/edges
+    result = { ...template };
+  } else {
+    // Return summary without nodes/edges
+    const { nodes, edges, ...metadata } = template;
+    result = {
+      ...metadata,
+      nodeCount: nodes?.length ?? 0,
+      edgeCount: edges?.length ?? 0,
+    };
+  }
 
   if (include_setup_guide) {
     result.setupGuide = generateSetupGuide(template_id);

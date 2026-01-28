@@ -119,6 +119,143 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
  * - Event: network, contractAddress, contractABI, eventName
  */
 
+// Layout constants for auto-positioning nodes
+const LAYOUT = {
+  NODE_WIDTH: 200,
+  NODE_HEIGHT: 100,
+  HORIZONTAL_GAP: 100, // Gap between columns
+  VERTICAL_GAP: 50, // Gap between nodes in same column
+  START_X: 0,
+  START_Y: 200,
+};
+
+/**
+ * Auto-layouts workflow nodes horizontally (left-to-right) based on edge connections.
+ * Nodes are positioned in columns based on their depth from the root (trigger) node.
+ * Sibling nodes (same parent) are spread vertically.
+ */
+function autoLayoutNodes(
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined,
+  edges: z.infer<typeof WorkflowEdgeSchema>[] | undefined
+): z.infer<typeof WorkflowNodeSchema>[] | undefined {
+  if (!nodes || nodes.length === 0) {
+    return nodes;
+  }
+
+  // Build adjacency list from edges
+  const childrenMap = new Map<string, string[]>();
+  const parentMap = new Map<string, string[]>();
+  const nodeIds = new Set(nodes.map((n) => n.id));
+
+  for (const edge of edges ?? []) {
+    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
+      continue;
+    }
+    if (!childrenMap.has(edge.source)) {
+      childrenMap.set(edge.source, []);
+    }
+    childrenMap.get(edge.source)!.push(edge.target);
+
+    if (!parentMap.has(edge.target)) {
+      parentMap.set(edge.target, []);
+    }
+    parentMap.get(edge.target)!.push(edge.source);
+  }
+
+  // Find root nodes (no incoming edges)
+  const rootNodes = nodes.filter((n) => !parentMap.has(n.id) || parentMap.get(n.id)!.length === 0);
+
+  // BFS to assign depths (columns)
+  const nodeDepths = new Map<string, number>();
+  const queue: { id: string; depth: number }[] = rootNodes.map((n) => ({ id: n.id, depth: 0 }));
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const { id, depth } = queue.shift()!;
+    if (visited.has(id)) {
+      // Update depth if we found a longer path
+      if (depth > (nodeDepths.get(id) ?? 0)) {
+        nodeDepths.set(id, depth);
+      }
+      continue;
+    }
+    visited.add(id);
+    nodeDepths.set(id, depth);
+
+    const children = childrenMap.get(id) ?? [];
+    for (const childId of children) {
+      queue.push({ id: childId, depth: depth + 1 });
+    }
+  }
+
+  // Handle any disconnected nodes
+  for (const node of nodes) {
+    if (!nodeDepths.has(node.id)) {
+      nodeDepths.set(node.id, 0);
+    }
+  }
+
+  // Group nodes by depth (column)
+  const columns = new Map<number, string[]>();
+  for (const [nodeId, depth] of nodeDepths) {
+    if (!columns.has(depth)) {
+      columns.set(depth, []);
+    }
+    columns.get(depth)!.push(nodeId);
+  }
+
+  // Calculate positions
+  const nodePositions = new Map<string, { x: number; y: number }>();
+  const columnWidth = LAYOUT.NODE_WIDTH + LAYOUT.HORIZONTAL_GAP;
+
+  for (const [depth, nodeIdsInColumn] of columns) {
+    const x = LAYOUT.START_X + depth * columnWidth;
+    const totalHeight = nodeIdsInColumn.length * (LAYOUT.NODE_HEIGHT + LAYOUT.VERTICAL_GAP) - LAYOUT.VERTICAL_GAP;
+    const startY = LAYOUT.START_Y - totalHeight / 2 + LAYOUT.NODE_HEIGHT / 2;
+
+    nodeIdsInColumn.forEach((nodeId, index) => {
+      const y = startY + index * (LAYOUT.NODE_HEIGHT + LAYOUT.VERTICAL_GAP);
+      nodePositions.set(nodeId, { x, y });
+    });
+  }
+
+  // Apply positions to nodes
+  return nodes.map((node) => {
+    const position = nodePositions.get(node.id);
+    if (position) {
+      return { ...node, position };
+    }
+    return node;
+  });
+}
+
+/**
+ * Checks if nodes need auto-layout (missing or overlapping positions).
+ */
+function needsAutoLayout(nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined): boolean {
+  if (!nodes || nodes.length === 0) {
+    return false;
+  }
+
+  // Check if any node is missing position
+  const hasMissingPositions = nodes.some((n) => !n.position);
+  if (hasMissingPositions) {
+    return true;
+  }
+
+  // Check for overlapping or poorly spaced nodes (all at same x or y)
+  const positions = nodes.map((n) => n.position!);
+  const uniqueX = new Set(positions.map((p) => p.x));
+  const uniqueY = new Set(positions.map((p) => p.y));
+
+  // If all nodes are in a single column (same x) or single row (same y) with >2 nodes, re-layout
+  if (nodes.length > 2 && (uniqueX.size === 1 || uniqueY.size === 1)) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Validates that all edges reference existing node IDs.
  * Returns warnings for any orphaned edges.
@@ -221,11 +358,20 @@ export async function handleListWorkflows(
   args: z.infer<typeof listWorkflowsSchema>
 ) {
   const workflows = await client.listWorkflows(args);
+
+  // Return summary without nodes/edges to reduce response size
+  // Use get_workflow for full details of a specific workflow
+  const summary = workflows.map(({ nodes, edges, ...rest }) => ({
+    ...rest,
+    nodeCount: nodes?.length ?? 0,
+    edgeCount: edges?.length ?? 0,
+  }));
+
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(workflows, null, 2),
+        text: JSON.stringify(summary, null, 2),
       },
     ],
   };
@@ -266,9 +412,14 @@ export async function handleCreateWorkflow(
     };
   }
 
+  // Auto-layout nodes if positions are missing or poorly arranged
+  const layoutedNodes = needsAutoLayout(normalizedNodes)
+    ? autoLayoutNodes(normalizedNodes, args.edges)
+    : normalizedNodes;
+
   const workflow = await client.createWorkflow({
     ...args,
-    nodes: normalizedNodes,
+    nodes: layoutedNodes,
   });
 
   // Include corrections in the response if any were made
@@ -308,10 +459,15 @@ export async function handleUpdateWorkflow(
     };
   }
 
+  // Auto-layout nodes if positions are missing or poorly arranged
+  const layoutedNodes = needsAutoLayout(normalizedNodes)
+    ? autoLayoutNodes(normalizedNodes, updateData.edges)
+    : normalizedNodes;
+
   const workflow = await client.updateWorkflow({
     workflowId: workflow_id,
     ...updateData,
-    nodes: normalizedNodes,
+    nodes: layoutedNodes,
   });
 
   // Include corrections in the response if any were made

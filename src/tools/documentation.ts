@@ -13,6 +13,7 @@ export async function handleToolsDocumentation(
   const allDocs = getToolsDocumentation();
 
   if (tool_name) {
+    // Specific tool requested - return full docs for that tool
     const doc = allDocs[tool_name];
     if (!doc) {
       return {
@@ -36,16 +37,20 @@ export async function handleToolsDocumentation(
     };
   }
 
-  const result: Record<string, any> = {};
+  // No specific tool - return summary list only
+  const summary: Record<string, string> = {};
   for (const [name, doc] of Object.entries(allDocs)) {
-    result[name] = doc[format];
+    summary[name] = doc.essentials.description;
   }
 
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(result, null, 2),
+        text: JSON.stringify({
+          availableTools: summary,
+          tip: 'Use tool_name parameter to get detailed documentation for a specific tool',
+        }, null, 2),
       },
     ],
   };

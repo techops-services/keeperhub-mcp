@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 export const listActionSchemasSchema = z.object({
-  category: z.string().optional().describe('Filter by category (e.g., "web3", "discord", "sendgrid", "webhook", "system")'),
+  category: z.string().optional().describe('Filter by category to get full schema (e.g., "web3", "discord", "sendgrid", "webhook", "system")'),
+  include_full_schemas: z.boolean().optional().default(false).describe('Include full field definitions (default: false, returns action names/descriptions only)'),
 });
 
 const ACTION_SCHEMAS = {
@@ -236,12 +237,36 @@ const EDGE_STRUCTURE_EXAMPLE = {
   // NOTE: Do NOT use sourceHandle or targetHandle - KeeperHub nodes use simple handles without IDs
 };
 
+/**
+ * Creates a summary of actions (actionType + description only) for a category.
+ */
+function summarizeActions(actions: Record<string, any>): Record<string, string> {
+  const summary: Record<string, string> = {};
+  for (const [actionType, schema] of Object.entries(actions)) {
+    summary[actionType] = schema.description;
+  }
+  return summary;
+}
+
+/**
+ * Creates a summary of triggers (triggerType + description only).
+ */
+function summarizeTriggers(triggers: Record<string, any>): Record<string, string> {
+  const summary: Record<string, string> = {};
+  for (const [triggerType, schema] of Object.entries(triggers)) {
+    summary[triggerType] = schema.description;
+  }
+  return summary;
+}
+
 export async function handleListActionSchemas(
   args: z.infer<typeof listActionSchemasSchema>
 ) {
   let result: Record<string, unknown> = {};
+  const includeFullSchemas = args.include_full_schemas ?? false;
 
   if (args.category) {
+    // When category specified, always return full schema for that category
     const category = args.category.toLowerCase();
     if (category in ACTION_SCHEMAS) {
       result = {
@@ -253,7 +278,8 @@ export async function handleListActionSchemas(
         availableCategories: Object.keys(ACTION_SCHEMAS),
       };
     }
-  } else {
+  } else if (includeFullSchemas) {
+    // Full schemas requested
     result = {
       actions: ACTION_SCHEMAS,
       triggers: TRIGGER_SCHEMAS,
@@ -266,6 +292,26 @@ export async function handleListActionSchemas(
         'network should be chain ID as string (e.g., "1" for mainnet, "11155111" for sepolia)',
         'Edges only need id, source, and target - do NOT use sourceHandle or targetHandle',
         'TRIGGER FIELDS: Use "scheduleCron" (not "schedule"), "network" and "contractAddress" (not "eventNetwork"/"eventAddress")',
+        'NODE POSITIONS: Positions are optional - nodes will be auto-laid out horizontally (left-to-right) based on edge connections',
+      ],
+    };
+  } else {
+    // Default: return summary only (action names + descriptions)
+    const actionsSummary: Record<string, { category: string; description: string; actions: Record<string, string> }> = {};
+    for (const [key, value] of Object.entries(ACTION_SCHEMAS)) {
+      actionsSummary[key] = {
+        category: value.category,
+        description: value.description,
+        actions: summarizeActions(value.actions),
+      };
+    }
+
+    result = {
+      actions: actionsSummary,
+      triggers: summarizeTriggers(TRIGGER_SCHEMAS),
+      tips: [
+        'Use category parameter to get full schema for a specific category (e.g., category: "web3")',
+        'Use include_full_schemas: true to get all field definitions',
       ],
     };
   }
