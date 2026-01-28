@@ -18,6 +18,20 @@ const ACTION_SCHEMAS = {
         },
         optionalFields: {},
         behavior: 'GATE (not branch) - execution only continues if condition is TRUE. No false branch exists.',
+        example: {
+          description: 'If/else pattern for balance check with two parallel conditions',
+          nodes: [
+            { id: 'condition-low', config: { actionType: 'Condition', condition: '{{@check-balance:Check Balance.balance}} < 1' }, label: 'Balance < 1 ETH' },
+            { id: 'condition-ok', config: { actionType: 'Condition', condition: '{{@check-balance:Check Balance.balance}} >= 1' }, label: 'Balance >= 1 ETH' },
+          ],
+          edges: [
+            { id: 'e1', source: 'check-balance', target: 'condition-low' },
+            { id: 'e2', source: 'check-balance', target: 'condition-ok' },
+            { id: 'e3', source: 'condition-low', target: 'action-on-true' },
+            { id: 'e4', source: 'condition-ok', target: 'action-on-false' },
+          ],
+          note: 'Both conditions receive output from check-balance. Each acts as a gate - only passes through if its condition is true.',
+        },
       },
       'HTTP Request': {
         actionType: 'HTTP Request',

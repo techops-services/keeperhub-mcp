@@ -301,6 +301,57 @@ function validateEdges(
 }
 
 /**
+ * Validates Condition node usage and returns warnings for common mistakes.
+ * Condition nodes act as GATES (not branches) - they only pass through if condition is TRUE.
+ * For if/else logic, TWO separate Condition nodes should be used with opposite conditions.
+ */
+function validateConditionNodes(
+  nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined,
+  edges: z.infer<typeof WorkflowEdgeSchema>[] | undefined
+): string[] {
+  if (!nodes || !edges || edges.length === 0) {
+    return [];
+  }
+
+  const warnings: string[] = [];
+
+  // Find all Condition nodes
+  const conditionNodeIds = new Set<string>();
+  for (const node of nodes) {
+    const data = node.data as Record<string, unknown>;
+    const config = data.config as Record<string, unknown> | undefined;
+    if (config?.actionType === 'Condition') {
+      conditionNodeIds.add(node.id);
+    }
+  }
+
+  // Count outgoing edges per Condition node
+  const outgoingEdgeCounts = new Map<string, number>();
+  for (const edge of edges) {
+    if (conditionNodeIds.has(edge.source)) {
+      outgoingEdgeCounts.set(
+        edge.source,
+        (outgoingEdgeCounts.get(edge.source) ?? 0) + 1
+      );
+    }
+  }
+
+  // Warn if any Condition node has multiple outgoing edges
+  for (const [nodeId, count] of outgoingEdgeCounts) {
+    if (count > 1) {
+      warnings.push(
+        `WARNING: Condition node "${nodeId}" has ${count} outgoing edges. ` +
+        `Condition nodes act as GATES, not branches - they only pass through when TRUE. ` +
+        `For if/else logic, use TWO separate Condition nodes with opposite conditions ` +
+        `(e.g., "balance < 1" and "balance >= 1"), each connected to different actions.`
+      );
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * Normalizes action node configs by correcting common field name mistakes.
  * Returns the corrected nodes and a list of corrections made.
  * Only handles action nodes - trigger nodes should use correct field names from schema.
@@ -425,6 +476,19 @@ export async function handleCreateWorkflow(
     };
   }
 
+  // Validate Condition node usage
+  const conditionWarnings = validateConditionNodes(normalizedNodes, args.edges);
+  if (conditionWarnings.length > 0) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nPlease restructure using the correct if/else pattern with TWO Condition nodes.`,
+        },
+      ],
+    };
+  }
+
   // Auto-layout nodes if positions are missing or poorly arranged
   const layoutedNodes = needsAutoLayout(normalizedNodes)
     ? autoLayoutNodes(normalizedNodes, args.edges)
@@ -467,6 +531,19 @@ export async function handleUpdateWorkflow(
         {
           type: 'text' as const,
           text: `ERROR: Invalid edges detected. Please fix before updating workflow:\n${edgeWarnings.join('\n')}\n\nTip: Use get_workflow first to see existing node IDs.`,
+        },
+      ],
+    };
+  }
+
+  // Validate Condition node usage
+  const conditionWarnings = validateConditionNodes(normalizedNodes, updateData.edges);
+  if (conditionWarnings.length > 0) {
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nPlease restructure using the correct if/else pattern with TWO Condition nodes.`,
         },
       ],
     };
