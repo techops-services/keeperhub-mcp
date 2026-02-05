@@ -12,6 +12,7 @@ import type {
   WorkflowEdge,
   Integration,
   ListIntegrationsParams,
+  MCPSchemasResponse,
 } from '../types/index.js';
 
 type StreamMessage = {
@@ -199,6 +200,20 @@ export class KeeperHubClient {
     const path = `/api/integrations${query ? `?${query}` : ''}`;
 
     return this.request<Integration[]>(path);
+  }
+
+  /**
+   * Fetch workflow schemas from KeeperHub API
+   * Returns actions, triggers, chains, platform capabilities, and tips
+   */
+  async fetchSchemas(params?: { category?: string }): Promise<MCPSchemasResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.category) queryParams.set('category', params.category);
+
+    const query = queryParams.toString();
+    const path = `/api/mcp/schemas${query ? `?${query}` : ''}`;
+
+    return this.request<MCPSchemasResponse>(path);
   }
 
   async generateWorkflow(params: GenerateWorkflowRequest): Promise<GenerateWorkflowResponse> {

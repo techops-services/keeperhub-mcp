@@ -32,6 +32,7 @@ import {
   handleGenerateWorkflow,
   listActionSchemasSchema,
   handleListActionSchemas,
+  initSchemas,
   searchPluginsSchema,
   getPluginSchema,
   validatePluginConfigSchema,
@@ -684,6 +685,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 async function main() {
+  // Fetch schemas from KeeperHub API at startup (used by list_action_schemas)
+  await initSchemas(client);
+
   if (PORT) {
     startHTTPServer({
       server,

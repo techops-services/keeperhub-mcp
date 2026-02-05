@@ -114,3 +114,72 @@ export interface Integration {
 export interface ListIntegrationsParams {
   type?: IntegrationType;
 }
+
+// MCP Schemas response from /api/mcp/schemas
+export interface MCPActionSchema {
+  actionType: string;
+  label: string;
+  description: string;
+  category?: string;
+  integration?: string;
+  requiresCredentials?: boolean;
+  requiredFields: Record<string, string>;
+  optionalFields: Record<string, string>;
+  outputFields?: Record<string, string>;
+  behavior?: string;
+}
+
+export interface MCPTriggerSchema {
+  triggerType: string;
+  label: string;
+  description: string;
+  requiredFields: Record<string, string>;
+  optionalFields: Record<string, string>;
+  outputFields?: Record<string, string>;
+}
+
+export interface MCPChain {
+  chainId: number;
+  name: string;
+  symbol: string;
+  chainType: string;
+  isTestnet: boolean;
+  explorerUrl: string | null;
+}
+
+export interface MCPSchemasResponse {
+  version: string;
+  generatedAt: string;
+  actions: Record<string, MCPActionSchema>;
+  triggers: Record<string, MCPTriggerSchema>;
+  chains: MCPChain[];
+  platform: {
+    wallet: {
+      provider: string;
+      features: string[];
+      description: string;
+    } | null;
+    proxyContracts: {
+      supported: boolean;
+      autoDetectImplementation?: boolean;
+      supportedPatterns?: string[];
+      description?: string;
+    };
+    abiHandling: {
+      autoFetchVerified: boolean;
+      manualAbiSupported: boolean;
+      description: string;
+    } | null;
+  };
+  templateSyntax: {
+    pattern: string;
+    description: string;
+    examples: Array<{ template: string; description: string }>;
+    notes: string[];
+  };
+  workflowStructure: {
+    nodeStructure: Record<string, unknown>;
+    edgeStructure: Record<string, unknown>;
+  };
+  tips: string[];
+}
