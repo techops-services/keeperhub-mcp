@@ -20,6 +20,8 @@ import type {
   DirectReadResponse,
   DirectConditionNotMetResponse,
   DirectExecutionStatusResponse,
+  Project,
+  Tag,
 } from '../types/index.js';
 
 type StreamMessage = {
@@ -159,6 +161,8 @@ export class KeeperHubClient {
     const queryParams = new URLSearchParams();
     if (params?.limit) queryParams.set('limit', params.limit.toString());
     if (params?.offset) queryParams.set('offset', params.offset.toString());
+    if (params?.projectId) queryParams.set('projectId', params.projectId);
+    if (params?.tagId) queryParams.set('tagId', params.tagId);
 
     const query = queryParams.toString();
     const path = `/api/workflows${query ? `?${query}` : ''}`;
@@ -215,6 +219,14 @@ export class KeeperHubClient {
     const path = `/api/integrations${query ? `?${query}` : ''}`;
 
     return this.request<Integration[]>(path);
+  }
+
+  async listProjects(): Promise<Project[]> {
+    return this.request<Project[]>('/api/projects');
+  }
+
+  async listTags(): Promise<Tag[]> {
+    return this.request<Tag[]>('/api/tags');
   }
 
   /**
