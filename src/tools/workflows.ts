@@ -19,6 +19,8 @@ const WorkflowEdgeSchema = z.object({
 export const listWorkflowsSchema = z.object({
   limit: z.number().optional().describe('Maximum number of workflows to return'),
   offset: z.number().optional().describe('Number of workflows to skip'),
+  project_id: z.string().optional().describe('Filter workflows by project ID'),
+  tag_id: z.string().optional().describe('Filter workflows by tag ID'),
 });
 
 export const getWorkflowSchema = z.object({
@@ -28,6 +30,8 @@ export const getWorkflowSchema = z.object({
 export const createWorkflowSchema = z.object({
   name: z.string().describe('Name of the workflow'),
   description: z.string().optional().describe('Optional description'),
+  project_id: z.string().optional().nullable().describe('Project ID to assign the workflow to'),
+  tag_id: z.string().optional().nullable().describe('Tag ID to assign to the workflow'),
   nodes: z.array(WorkflowNodeSchema).optional().describe('Workflow nodes'),
   edges: z.array(WorkflowEdgeSchema).optional().describe('Workflow edges'),
 });
@@ -36,6 +40,8 @@ export const updateWorkflowSchema = z.object({
   workflow_id: z.string().describe('The ID of the workflow to update'),
   name: z.string().optional().describe('New name for the workflow'),
   description: z.string().optional().describe('New description'),
+  project_id: z.string().optional().nullable().describe('Project ID to assign the workflow to (null to unassign)'),
+  tag_id: z.string().optional().nullable().describe('Tag ID to assign to the workflow (null to unassign)'),
   nodes: z.array(WorkflowNodeSchema).optional().describe('Updated workflow nodes'),
   edges: z.array(WorkflowEdgeSchema).optional().describe('Updated workflow edges'),
 });
@@ -554,7 +560,12 @@ export async function handleListWorkflows(
   client: KeeperHubClient,
   args: z.infer<typeof listWorkflowsSchema>
 ) {
-  const workflows = await client.listWorkflows(args);
+  const workflows = await client.listWorkflows({
+    limit: args.limit,
+    offset: args.offset,
+    projectId: args.project_id,
+    tagId: args.tag_id,
+  });
 
   // Return summary without nodes/edges to reduce response size
   // Use get_workflow for full details of a specific workflow
@@ -631,8 +642,12 @@ export async function handleCreateWorkflow(
     : nodesWithUIFields;
 
   const workflow = await client.createWorkflow({
-    ...args,
+    name: args.name,
+    description: args.description,
+    projectId: args.project_id,
+    tagId: args.tag_id,
     nodes: layoutedNodes,
+    edges: args.edges,
   });
 
   // Include corrections in the response if any were made
@@ -695,8 +710,12 @@ export async function handleUpdateWorkflow(
 
   const workflow = await client.updateWorkflow({
     workflowId: workflow_id,
-    ...updateData,
+    name: updateData.name,
+    description: updateData.description,
+    projectId: args.project_id,
+    tagId: args.tag_id,
     nodes: layoutedNodes,
+    edges: updateData.edges,
   });
 
   // Include corrections in the response if any were made
