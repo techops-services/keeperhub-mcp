@@ -13,6 +13,13 @@ import type {
   Integration,
   ListIntegrationsParams,
   MCPSchemasResponse,
+  TransferParams,
+  ContractCallParams,
+  CheckAndExecuteParams,
+  DirectExecutionResponse,
+  DirectReadResponse,
+  DirectConditionNotMetResponse,
+  DirectExecutionStatusResponse,
 } from '../types/index.js';
 
 type StreamMessage = {
@@ -72,9 +79,11 @@ export class KeeperHubClient {
 
   private async request<T>(
     path: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    requestTimeout?: number
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
+    const effectiveTimeout = requestTimeout ?? this.timeout;
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',
@@ -89,7 +98,7 @@ export class KeeperHubClient {
 
     // Create an AbortController for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     try {
       const response = await fetch(url, {
@@ -108,7 +117,13 @@ export class KeeperHubClient {
         if (contentType && contentType.includes('application/json')) {
           try {
             const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
+            // Preserve structured error fields (error, field, details, code)
+            // so MCP consumers can use them for self-correction
+            if (errorData.field || errorData.details || errorData.code) {
+              errorMessage = JSON.stringify(errorData);
+            } else {
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            }
           } catch {
             // Failed to parse error response, use default message
           }
@@ -133,7 +148,7 @@ export class KeeperHubClient {
       clearTimeout(timeoutId);
 
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timeout after ${this.timeout}ms`);
+        throw new Error(`Request timeout after ${effectiveTimeout}ms`);
       }
 
       throw error;
@@ -214,6 +229,46 @@ export class KeeperHubClient {
     const path = `/api/mcp/schemas${query ? `?${query}` : ''}`;
 
     return this.request<MCPSchemasResponse>(path);
+  }
+
+  async executeTransfer(
+    params: TransferParams
+  ): Promise<DirectExecutionResponse> {
+    return this.request<DirectExecutionResponse>(
+      '/api/execute/transfer',
+      { method: 'POST', body: JSON.stringify(params) },
+      60_000
+    );
+  }
+
+  async executeContractCall(
+    params: ContractCallParams
+  ): Promise<DirectExecutionResponse | DirectReadResponse> {
+    return this.request<DirectExecutionResponse | DirectReadResponse>(
+      '/api/execute/contract-call',
+      { method: 'POST', body: JSON.stringify(params) },
+      60_000
+    );
+  }
+
+  async executeCheckAndExecute(
+    params: CheckAndExecuteParams
+  ): Promise<DirectExecutionResponse | DirectConditionNotMetResponse> {
+    return this.request<
+      DirectExecutionResponse | DirectConditionNotMetResponse
+    >(
+      '/api/execute/check-and-execute',
+      { method: 'POST', body: JSON.stringify(params) },
+      60_000
+    );
+  }
+
+  async getDirectExecutionStatus(
+    executionId: string
+  ): Promise<DirectExecutionStatusResponse> {
+    return this.request<DirectExecutionStatusResponse>(
+      `/api/execute/${executionId}/status`
+    );
   }
 
   async generateWorkflow(params: GenerateWorkflowRequest): Promise<GenerateWorkflowResponse> {

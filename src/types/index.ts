@@ -183,3 +183,82 @@ export interface MCPSchemasResponse {
   };
   tips: string[];
 }
+
+// Direct Execution API types
+export type DirectExecutionType = 'transfer' | 'contract-call' | 'check-and-execute';
+export type DirectExecutionStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface TransferParams {
+  network: string;
+  recipientAddress: string;
+  amount: string;
+  tokenAddress?: string;
+  tokenConfig?: string | Record<string, unknown>;
+}
+
+export interface ContractCallParams {
+  contractAddress: string;
+  network: string;
+  functionName: string;
+  functionArgs?: string;
+  abi?: string;
+  value?: string;
+  gasLimitMultiplier?: string;
+}
+
+export interface CheckAndExecuteParams {
+  contractAddress: string;
+  network: string;
+  functionName: string;
+  functionArgs?: string;
+  abi?: string;
+  condition: {
+    operator: 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte';
+    value: string;
+  };
+  action: {
+    contractAddress: string;
+    functionName: string;
+    functionArgs?: string;
+    abi?: string;
+    gasLimitMultiplier?: string;
+  };
+}
+
+export interface DirectExecutionResponse {
+  executionId: string;
+  status: DirectExecutionStatus;
+  executed?: boolean;
+  conditionResult?: {
+    met: boolean;
+    observedValue: string;
+    targetValue: string;
+    operator: string;
+  };
+}
+
+export interface DirectReadResponse {
+  result: string;
+}
+
+export interface DirectConditionNotMetResponse {
+  executed: false;
+  conditionResult: {
+    met: false;
+    observedValue: string;
+    targetValue: string;
+    operator: string;
+  };
+}
+
+export interface DirectExecutionStatusResponse {
+  executionId: string;
+  status: DirectExecutionStatus;
+  type: DirectExecutionType;
+  transactionHash: string | null;
+  transactionLink: string | null;
+  result: unknown;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
