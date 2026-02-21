@@ -51,6 +51,14 @@ import {
   getWalletIntegrationSchema,
   handleListIntegrations,
   handleGetWalletIntegration,
+  executeTransferSchema,
+  executeContractCallSchema,
+  executeCheckAndExecuteSchema,
+  getDirectExecutionStatusSchema,
+  handleExecuteTransfer,
+  handleExecuteContractCall,
+  handleExecuteCheckAndExecute,
+  handleGetDirectExecutionStatus,
 } from './tools/index.js';
 import {
   handleWorkflowsResource,
@@ -118,8 +126,10 @@ Use these tools when the user wants to:
 - Automate token transfers, swaps, or DeFi operations
 - Execute workflows for blockchain automation tasks
 - Generate workflows from natural language for Web3 use cases
+- Execute direct on-chain operations (transfers, contract calls) without building a workflow
+- Read smart contract state or call view functions directly
 
-Available operations: workflow CRUD, AI-powered workflow generation, async execution with status polling and logs.`;
+Available operations: workflow CRUD, AI-powered workflow generation, async execution with status polling and logs, direct on-chain execution (transfer, contract-call, check-and-execute).`;
 
 const server = new Server(
   {
@@ -542,6 +552,191 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+      {
+        name: 'execute_transfer',
+        description:
+          'Send ETH or ERC-20 tokens directly without creating a workflow. The transaction executes synchronously and the returned status will be "completed" or "failed". Use get_direct_execution_status to retrieve full details including transactionHash and block explorer link. For native transfers, omit token_address. For ERC-20, provide the token contract address.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            network: {
+              type: 'string',
+              description:
+                'Blockchain network (e.g., "ethereum", "sepolia", "polygon", "base")',
+            },
+            recipient_address: {
+              type: 'string',
+              description: 'Destination wallet address (0x...)',
+            },
+            amount: {
+              type: 'string',
+              description:
+                'Amount in human-readable units (e.g., "0.1" for 0.1 ETH)',
+            },
+            token_address: {
+              type: 'string',
+              description:
+                'ERC-20 token contract address. Omit for native ETH/MATIC/etc.',
+            },
+            token_config: {
+              type: 'string',
+              description:
+                'JSON string with token config (decimals, symbol) for non-standard tokens',
+            },
+          },
+          required: ['network', 'recipient_address', 'amount'],
+        },
+      },
+      {
+        name: 'execute_contract_call',
+        description:
+          'Call any smart contract function directly. Auto-detects read vs write: read functions (view/pure) return {"result": ...} immediately, write functions execute synchronously and return {"executionId": ..., "status": "completed"|"failed"}. Use get_direct_execution_status for full details including transactionHash. ABI is auto-fetched from block explorer if not provided.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contract_address: {
+              type: 'string',
+              description: 'Target smart contract address (0x...)',
+            },
+            network: {
+              type: 'string',
+              description:
+                'Blockchain network (e.g., "ethereum", "sepolia", "polygon", "base")',
+            },
+            function_name: {
+              type: 'string',
+              description:
+                'Contract function to call (e.g., "balanceOf", "transfer", "approve")',
+            },
+            function_args: {
+              type: 'string',
+              description:
+                'Function arguments as JSON array string (e.g., \'["0xAddress", "1000"]\')',
+            },
+            abi: {
+              type: 'string',
+              description:
+                'Contract ABI as JSON string. Auto-fetched from block explorer if omitted.',
+            },
+            value: {
+              type: 'string',
+              description:
+                'ETH value to send with the call in wei (for payable functions)',
+            },
+            gas_limit_multiplier: {
+              type: 'string',
+              description:
+                'Gas limit multiplier (e.g., "1.5" for 50% buffer)',
+            },
+          },
+          required: ['contract_address', 'network', 'function_name'],
+        },
+      },
+      {
+        name: 'execute_check_and_execute',
+        description:
+          'Read a contract value, evaluate a condition, and execute a write action if the condition is met. If the condition is not met, returns {"executed": false} immediately. If met, the write executes synchronously and returns {"executionId": ..., "status": "completed"|"failed", "executed": true}. Useful for conditional on-chain operations (e.g., "if balance > threshold, then transfer").',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contract_address: {
+              type: 'string',
+              description:
+                'Contract address to read for condition check (0x...)',
+            },
+            network: {
+              type: 'string',
+              description:
+                'Blockchain network (e.g., "ethereum", "sepolia", "polygon", "base")',
+            },
+            function_name: {
+              type: 'string',
+              description: 'Read function to call for condition evaluation',
+            },
+            function_args: {
+              type: 'string',
+              description:
+                'Arguments for the read function as JSON array string',
+            },
+            abi: {
+              type: 'string',
+              description:
+                'ABI for the read contract. Auto-fetched if omitted.',
+            },
+            condition: {
+              type: 'object',
+              description: 'Condition to evaluate against the read result',
+              properties: {
+                operator: {
+                  type: 'string',
+                  enum: ['eq', 'neq', 'gt', 'lt', 'gte', 'lte'],
+                  description: 'Comparison operator',
+                },
+                value: {
+                  type: 'string',
+                  description:
+                    'Target value to compare against (supports BigInt strings)',
+                },
+              },
+              required: ['operator', 'value'],
+            },
+            action: {
+              type: 'object',
+              description:
+                'Write action to execute if the condition is met',
+              properties: {
+                contract_address: {
+                  type: 'string',
+                  description: 'Contract address for the write action',
+                },
+                function_name: {
+                  type: 'string',
+                  description: 'Function to call if condition is met',
+                },
+                function_args: {
+                  type: 'string',
+                  description:
+                    'Arguments for the action function as JSON array string',
+                },
+                abi: {
+                  type: 'string',
+                  description:
+                    'ABI for the action contract. Auto-fetched if omitted.',
+                },
+                gas_limit_multiplier: {
+                  type: 'string',
+                  description:
+                    'Gas limit multiplier for the action transaction',
+                },
+              },
+              required: ['contract_address', 'function_name'],
+            },
+          },
+          required: [
+            'contract_address',
+            'network',
+            'function_name',
+            'condition',
+            'action',
+          ],
+        },
+      },
+      {
+        name: 'get_direct_execution_status',
+        description:
+          'Check the status of a direct execution (transfer, contract call, or check-and-execute). Returns status, transaction hash, block explorer link, and any errors.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            execution_id: {
+              type: 'string',
+              description:
+                'The execution ID returned from a direct execution call',
+            },
+          },
+          required: ['execution_id'],
+        },
+      },
     ],
   };
 });
@@ -630,6 +825,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_wallet_integration': {
         getWalletIntegrationSchema.parse(request.params.arguments);
         return await handleGetWalletIntegration(client);
+      }
+      case 'execute_transfer': {
+        const args = executeTransferSchema.parse(request.params.arguments);
+        return await handleExecuteTransfer(client, args);
+      }
+      case 'execute_contract_call': {
+        const args = executeContractCallSchema.parse(request.params.arguments);
+        return await handleExecuteContractCall(client, args);
+      }
+      case 'execute_check_and_execute': {
+        const args = executeCheckAndExecuteSchema.parse(request.params.arguments);
+        return await handleExecuteCheckAndExecute(client, args);
+      }
+      case 'get_direct_execution_status': {
+        const args = getDirectExecutionStatusSchema.parse(request.params.arguments);
+        return await handleGetDirectExecutionStatus(client, args);
       }
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);
