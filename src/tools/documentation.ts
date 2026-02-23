@@ -355,6 +355,64 @@ function getToolsDocumentation(): Record<string, any> {
         relatedTools: ['search_templates', 'deploy_template'],
       },
     },
+    list_projects: {
+      essentials: {
+        description: 'List all projects in the organization for grouping workflows',
+        keyParameters: [],
+        example: 'List projects: {}',
+        performance: 'Returns all projects in one API call',
+        tips: [
+          'Call this before create_workflow/update_workflow to discover valid project IDs',
+          'Use the returned id as project_id in workflow tools',
+        ],
+      },
+      full: {
+        description:
+          'List all projects in the organization. Projects group related workflows together. Returns id, name, description, workflowCount, and createdAt for each project.',
+        parameters: {},
+        returns:
+          'Object with projects array (id, name, description, workflowCount, createdAt) and a usage hint',
+        examples: ['List all projects: {}'],
+        useCases: [
+          'Discover available project IDs before creating or updating workflows',
+          'Understand how workflows are organized in the organization',
+        ],
+        bestPractices: [
+          'Call list_projects at the start of workflow management tasks',
+          'Pass the project id directly as project_id in create_workflow or update_workflow',
+        ],
+        relatedTools: ['list_tags', 'list_workflows', 'create_workflow', 'update_workflow'],
+      },
+    },
+    list_tags: {
+      essentials: {
+        description: 'List all tags in the organization for labeling workflows',
+        keyParameters: [],
+        example: 'List tags: {}',
+        performance: 'Returns all tags in one API call',
+        tips: [
+          'Call this before create_workflow/update_workflow to discover valid tag IDs',
+          'Use the returned id as tag_id in workflow tools',
+        ],
+      },
+      full: {
+        description:
+          'List all tags in the organization. Tags label workflows for categorization (e.g., production, monitoring, liquidation). Returns id, name, color, workflowCount, and createdAt for each tag.',
+        parameters: {},
+        returns:
+          'Object with tags array (id, name, color, workflowCount, createdAt) and a usage hint',
+        examples: ['List all tags: {}'],
+        useCases: [
+          'Discover available tag IDs before creating or updating workflows',
+          'See how workflows are categorized across the organization',
+        ],
+        bestPractices: [
+          'Call list_tags at the start of workflow management tasks',
+          'Pass the tag id directly as tag_id in create_workflow or update_workflow',
+        ],
+        relatedTools: ['list_projects', 'list_workflows', 'create_workflow', 'update_workflow'],
+      },
+    },
     deploy_template: {
       essentials: {
         description: 'Deploy a template as a new workflow with customizations',

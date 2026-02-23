@@ -38,7 +38,14 @@ export async function handleListIntegrations(
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(integrations, null, 2),
+        text: JSON.stringify(
+          {
+            integrations,
+            hint: 'Use the id field as integrationId in workflow nodes (e.g., web3/write-contract). Use get_wallet_integration to quickly find your web3 wallet integration.',
+          },
+          null,
+          2
+        ),
       },
     ],
   };
