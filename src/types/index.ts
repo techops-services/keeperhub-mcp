@@ -21,6 +21,8 @@ export interface Workflow {
   name: string;
   description?: string;
   organizationId: string;
+  projectId?: string | null;
+  tagId?: string | null;
   nodes?: WorkflowNode[];
   edges?: WorkflowEdge[];
   createdAt: string;
@@ -65,11 +67,15 @@ export interface GenerateWorkflowResponse {
 export interface ListWorkflowsParams {
   limit?: number;
   offset?: number;
+  projectId?: string;
+  tagId?: string;
 }
 
 export interface CreateWorkflowParams {
   name: string;
   description?: string;
+  projectId?: string | null;
+  tagId?: string | null;
   nodes?: WorkflowNode[];
   edges?: WorkflowEdge[];
 }
@@ -78,6 +84,8 @@ export interface UpdateWorkflowParams {
   workflowId: string;
   name?: string;
   description?: string;
+  projectId?: string | null;
+  tagId?: string | null;
   nodes?: WorkflowNode[];
   edges?: WorkflowEdge[];
 }
@@ -113,6 +121,28 @@ export interface Integration {
 
 export interface ListIntegrationsParams {
   type?: IntegrationType;
+}
+
+// Project and Tag types
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  workflowCount: number;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // MCP Schemas response from /api/mcp/schemas

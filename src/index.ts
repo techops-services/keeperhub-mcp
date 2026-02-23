@@ -59,6 +59,10 @@ import {
   handleExecuteContractCall,
   handleExecuteCheckAndExecute,
   handleGetDirectExecutionStatus,
+  listProjectsSchema,
+  listTagsSchema,
+  handleListProjects,
+  handleListTags,
 } from './tools/index.js';
 import {
   handleWorkflowsResource,
@@ -164,6 +168,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'number',
               description: 'Number of workflows to skip for pagination',
             },
+            project_id: {
+              type: 'string',
+              description: 'Filter workflows by project ID',
+            },
+            tag_id: {
+              type: 'string',
+              description: 'Filter workflows by tag ID',
+            },
           },
         },
       },
@@ -197,6 +209,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Optional description of what the workflow automates',
             },
+            project_id: {
+              type: 'string',
+              description: 'Project ID to assign the workflow to (use list_projects to discover IDs)',
+            },
+            tag_id: {
+              type: 'string',
+              description: 'Tag ID to assign to the workflow (use list_tags to discover IDs)',
+            },
             nodes: {
               type: 'array',
               description:
@@ -228,6 +248,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             description: {
               type: 'string',
               description: 'Updated description',
+            },
+            project_id: {
+              type: ['string', 'null'],
+              description: 'Project ID to assign the workflow to (null to unassign)',
+            },
+            tag_id: {
+              type: ['string', 'null'],
+              description: 'Tag ID to assign to the workflow (null to unassign)',
             },
             nodes: {
               type: 'array',
@@ -737,6 +765,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['execution_id'],
         },
       },
+      {
+        name: 'list_projects',
+        description:
+          'List all projects in the organization. Projects group related workflows together. Use project IDs when creating or updating workflows to organize them.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'list_tags',
+        description:
+          'List all tags in the organization. Tags label workflows for categorization (e.g., production, monitoring, liquidation). Use tag IDs when creating or updating workflows.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -841,6 +887,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_direct_execution_status': {
         const args = getDirectExecutionStatusSchema.parse(request.params.arguments);
         return await handleGetDirectExecutionStatus(client, args);
+      }
+      case 'list_projects': {
+        listProjectsSchema.parse(request.params.arguments);
+        return await handleListProjects(client);
+      }
+      case 'list_tags': {
+        listTagsSchema.parse(request.params.arguments);
+        return await handleListTags(client);
       }
       default:
         throw new Error(`Unknown tool: ${request.params.name}`);

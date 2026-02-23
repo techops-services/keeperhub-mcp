@@ -7,3 +7,4 @@ export * from './templates.js';
 export * from './documentation.js';
 export * from './integrations.js';
 export * from './direct-execution.js';
+export * from './projects-tags.js';

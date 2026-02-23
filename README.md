@@ -159,12 +159,16 @@ List workflows in the organization.
 **Parameters:**
 - `limit` (optional): Maximum number of workflows to return
 - `offset` (optional): Number of workflows to skip
+- `project_id` (optional): Filter by project ID (use `list_projects` to discover IDs)
+- `tag_id` (optional): Filter by tag ID (use `list_tags` to discover IDs)
 
 **Example:**
 ```typescript
 {
   "limit": 10,
-  "offset": 0
+  "offset": 0,
+  "project_id": "proj_abc123",
+  "tag_id": "tag_xyz789"
 }
 ```
 
@@ -187,6 +191,8 @@ Create a new workflow.
 **Parameters:**
 - `name` (required): Name of the workflow
 - `description` (optional): Optional description
+- `project_id` (optional): Project ID to assign (use `list_projects` to discover IDs)
+- `tag_id` (optional): Tag ID to assign (use `list_tags` to discover IDs)
 - `nodes` (optional): Workflow nodes array
 - `edges` (optional): Workflow edges array
 
@@ -195,6 +201,8 @@ Create a new workflow.
 {
   "name": "My Workflow",
   "description": "A simple workflow",
+  "project_id": "proj_abc123",
+  "tag_id": "tag_xyz789",
   "nodes": [
     {
       "id": "1",
@@ -213,6 +221,8 @@ Update workflow nodes/edges.
 - `workflow_id` (required): The ID of the workflow to update
 - `name` (optional): New name for the workflow
 - `description` (optional): New description
+- `project_id` (optional): Project ID to assign (`null` to unassign)
+- `tag_id` (optional): Tag ID to assign (`null` to unassign)
 - `nodes` (optional): Updated workflow nodes
 - `edges` (optional): Updated workflow edges
 
@@ -221,6 +231,7 @@ Update workflow nodes/edges.
 {
   "workflow_id": "wf_abc123",
   "name": "Updated Workflow Name",
+  "project_id": "proj_abc123",
   "nodes": [...]
 }
 ```
@@ -240,7 +251,7 @@ Delete a workflow.
 
 ### AI Generation
 
-#### `generate_workflow`
+#### `ai_generate_workflow`
 AI-powered workflow generation from natural language.
 
 **Parameters:**
@@ -298,6 +309,74 @@ Get execution logs.
   "execution_id": "exec_xyz789"
 }
 ```
+
+### Organization
+
+#### `list_projects`
+List all projects in the organization.
+
+**Parameters:** none
+
+**Example:**
+```typescript
+{}
+```
+
+#### `list_tags`
+List all tags in the organization.
+
+**Parameters:** none
+
+**Example:**
+```typescript
+{}
+```
+
+### Direct On-Chain Execution
+
+#### `execute_transfer`
+Send ETH or ERC-20 tokens directly without creating a workflow.
+
+**Parameters:**
+- `network` (required): Blockchain network (e.g., "ethereum", "polygon", "base")
+- `recipient_address` (required): Destination wallet address
+- `amount` (required): Amount in human-readable units (e.g., "0.1")
+- `token_address` (optional): ERC-20 contract address; omit for native transfers
+
+**Example:**
+```typescript
+{
+  "network": "sepolia",
+  "recipient_address": "0xRecipient...",
+  "amount": "0.01"
+}
+```
+
+#### `execute_contract_call`
+Call any smart contract function directly. Auto-detects read vs write.
+
+**Parameters:**
+- `contract_address` (required): Target contract address
+- `network` (required): Blockchain network
+- `function_name` (required): Function to call
+- `function_args` (optional): Arguments as JSON array string
+- `abi` (optional): ABI JSON string; auto-fetched if omitted
+
+#### `execute_check_and_execute`
+Read a contract value, evaluate a condition, and execute a write if met.
+
+**Parameters:**
+- `contract_address` (required): Contract to read
+- `network` (required): Blockchain network
+- `function_name` (required): Read function for condition
+- `condition` (required): `{operator, value}` — operators: eq, neq, gt, lt, gte, lte
+- `action` (required): `{contract_address, function_name, ...}` write to execute if condition is met
+
+#### `get_direct_execution_status`
+Check status of a direct execution. Returns tx hash and block explorer link.
+
+**Parameters:**
+- `execution_id` (required): ID returned from a direct execution call
 
 ## Available Resources
 

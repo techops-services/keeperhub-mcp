@@ -139,15 +139,17 @@ KEEPERHUB_API_KEY=kh_your_key_here pnpm start
 
 Once configured, you'll have access to these tools:
 
-- `list_workflows` - List all workflows
+- `list_workflows` - List all workflows (filter by `project_id` or `tag_id`)
 - `get_workflow` - Get workflow details
-- `create_workflow` - Create new workflow
-- `update_workflow` - Update existing workflow
+- `create_workflow` - Create new workflow (supports `project_id`, `tag_id`)
+- `update_workflow` - Update existing workflow (supports `project_id`, `tag_id`)
 - `delete_workflow` - Delete workflow
 - `generate_workflow` - AI-powered generation
 - `execute_workflow` - Run a workflow
 - `get_execution_status` - Check execution status
 - `get_execution_logs` - Get execution logs
+- `list_projects` - List projects (use IDs as `project_id` in workflow tools)
+- `list_tags` - List tags (use IDs as `tag_id` in workflow tools)
 
 ## Available Resources
 
