@@ -99,11 +99,13 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
   },
   'web3/transfer-funds': {
     chainId: 'network',
-    to: 'toAddress',
+    to: 'recipientAddress',
+    toAddress: 'recipientAddress',
   },
   'web3/transfer-token': {
     chainId: 'network',
-    to: 'toAddress',
+    to: 'recipientAddress',
+    toAddress: 'recipientAddress',
   },
   'web3/read-contract': {
     chainId: 'network',
