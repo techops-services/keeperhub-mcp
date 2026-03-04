@@ -25,9 +25,11 @@ import {
   executeWorkflowSchema,
   getExecutionStatusSchema,
   getExecutionLogsSchema,
+  listWorkflowExecutionsSchema,
   handleExecuteWorkflow,
   handleGetExecutionStatus,
   handleGetExecutionLogs,
+  handleListWorkflowExecutions,
   generateWorkflowSchema,
   handleGenerateWorkflow,
   listActionSchemasSchema,
@@ -310,7 +312,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'execute_workflow',
         description:
-          'Manually trigger a Web3 workflow execution. Useful for testing blockchain automations or running on-demand operations like batch transfers.',
+          'Manually trigger a Web3 workflow execution. Returns immediately with { executionId, status: "running" } — execution runs in the background. Use list_executions or get_execution_status to poll for completion.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -328,15 +330,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'list_executions',
+        description:
+          'List recent executions for a workflow (last 50). Use this to find execution IDs for debugging, then call get_execution_status or get_execution_logs for details.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow_id: {
+              type: 'string',
+              description: 'The ID of the workflow to list executions for',
+            },
+          },
+          required: ['workflow_id'],
+        },
+      },
+      {
         name: 'get_execution_status',
         description:
-          'Check the status of a running or completed workflow execution. Returns state (pending, running, completed, failed) and results.',
+          'Get rich execution status including per-node statuses, progress percentage, and full error context (failedNodeId, lastSuccessfulNode, executionTrace, error message) when a workflow fails.',
         inputSchema: {
           type: 'object',
           properties: {
             execution_id: {
               type: 'string',
-              description: 'The execution ID returned from execute_workflow',
+              description: 'The execution ID returned from execute_workflow or list_executions',
             },
           },
           required: ['execution_id'],
@@ -345,7 +362,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'get_execution_logs',
         description:
-          'Get detailed execution logs for a workflow run, including blockchain transaction hashes, API responses, and error details.',
+          'Get per-step execution logs for a workflow run. Each log entry includes nodeId, nodeName, nodeType, status, input, output, error, and duration. Essential for debugging failed steps.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -821,6 +838,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'execute_workflow': {
         const args = executeWorkflowSchema.parse(request.params.arguments);
         return await handleExecuteWorkflow(client, args);
+      }
+      case 'list_executions': {
+        const args = listWorkflowExecutionsSchema.parse(request.params.arguments);
+        return await handleListWorkflowExecutions(client, args);
       }
       case 'get_execution_status': {
         const args = getExecutionStatusSchema.parse(request.params.arguments);

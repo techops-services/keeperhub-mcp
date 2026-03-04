@@ -1,7 +1,9 @@
 import type {
   Workflow,
   WorkflowExecution,
-  ExecutionLog,
+  ExecutionStatusResponse,
+  ExecutionLogsResponse,
+  ExecuteWorkflowResponse,
   ListWorkflowsParams,
   CreateWorkflowParams,
   UpdateWorkflowParams,
@@ -195,20 +197,24 @@ export class KeeperHubClient {
     });
   }
 
-  async executeWorkflow(params: ExecuteWorkflowParams): Promise<WorkflowExecution> {
+  async executeWorkflow(params: ExecuteWorkflowParams): Promise<ExecuteWorkflowResponse> {
     const { workflowId, input } = params;
-    return this.request<WorkflowExecution>(`/api/workflow/${workflowId}/execute`, {
+    return this.request<ExecuteWorkflowResponse>(`/api/workflow/${workflowId}/execute`, {
       method: 'POST',
       body: JSON.stringify({ input }),
     });
   }
 
-  async getExecutionStatus(executionId: string): Promise<WorkflowExecution> {
-    return this.request<WorkflowExecution>(`/api/executions/${executionId}`);
+  async getExecutionStatus(executionId: string): Promise<ExecutionStatusResponse> {
+    return this.request<ExecutionStatusResponse>(`/api/workflows/executions/${executionId}/status`);
   }
 
-  async getExecutionLogs(executionId: string): Promise<ExecutionLog[]> {
-    return this.request<ExecutionLog[]>(`/api/executions/${executionId}/logs`);
+  async getExecutionLogs(executionId: string): Promise<ExecutionLogsResponse> {
+    return this.request<ExecutionLogsResponse>(`/api/workflows/executions/${executionId}/logs`);
+  }
+
+  async listWorkflowExecutions(workflowId: string): Promise<WorkflowExecution[]> {
+    return this.request<WorkflowExecution[]>(`/api/workflows/${workflowId}/executions`);
   }
 
   async listIntegrations(params?: ListIntegrationsParams): Promise<Integration[]> {
