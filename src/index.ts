@@ -151,6 +151,26 @@ const server = new Server(
   }
 );
 
+/**
+ * Pre-processes tool arguments to handle JSON-serialized arrays.
+ * Some MCP clients serialize array parameters as JSON strings when the inputSchema
+ * does not include an `items` definition. This function parses those strings back
+ * into arrays so Zod validation succeeds.
+ */
+function parseArrayArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...args };
+  for (const key of ['nodes', 'edges'] as const) {
+    if (typeof result[key] === 'string') {
+      try {
+        result[key] = JSON.parse(result[key] as string);
+      } catch {
+        // Leave as-is; Zod will report the type error with a clear message
+      }
+    }
+  }
+  return result;
+}
+
 // Register tool handlers
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
@@ -223,10 +243,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'array',
               description:
                 'Workflow nodes defining triggers and actions (smart contract events, conditions, token operations)',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  type: { type: 'string' },
+                  data: { type: 'object' },
+                  position: {
+                    type: 'object',
+                    properties: {
+                      x: { type: 'number' },
+                      y: { type: 'number' },
+                    },
+                  },
+                },
+                required: ['id', 'type', 'data'],
+              },
             },
             edges: {
               type: 'array',
               description: 'Connections between workflow nodes defining execution flow',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  source: { type: 'string' },
+                  target: { type: 'string' },
+                  sourceHandle: { type: 'string' },
+                  targetHandle: { type: 'string' },
+                },
+                required: ['id', 'source', 'target'],
+              },
             },
           },
           required: ['name'],
@@ -266,10 +313,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             nodes: {
               type: 'array',
               description: 'Updated workflow nodes (triggers, actions, conditions)',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  type: { type: 'string' },
+                  data: { type: 'object' },
+                  position: {
+                    type: 'object',
+                    properties: {
+                      x: { type: 'number' },
+                      y: { type: 'number' },
+                    },
+                  },
+                },
+                required: ['id', 'type', 'data'],
+              },
             },
             edges: {
               type: 'array',
               description: 'Updated connections between nodes',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  source: { type: 'string' },
+                  target: { type: 'string' },
+                  sourceHandle: { type: 'string' },
+                  targetHandle: { type: 'string' },
+                },
+                required: ['id', 'source', 'target'],
+              },
             },
           },
           required: ['workflow_id'],
@@ -820,11 +894,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleGetWorkflow(client, args);
       }
       case 'create_workflow': {
-        const args = createWorkflowSchema.parse(request.params.arguments);
+        const args = createWorkflowSchema.parse(
+          parseArrayArgs(request.params.arguments as Record<string, unknown>)
+        );
         return await handleCreateWorkflow(client, args);
       }
       case 'update_workflow': {
-        const args = updateWorkflowSchema.parse(request.params.arguments);
+        const args = updateWorkflowSchema.parse(
+          parseArrayArgs(request.params.arguments as Record<string, unknown>)
+        );
         return await handleUpdateWorkflow(client, args);
       }
       case 'delete_workflow': {

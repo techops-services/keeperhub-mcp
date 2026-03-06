@@ -336,8 +336,13 @@ function validateEdges(
 
 /**
  * Validates Condition node usage and returns warnings for common mistakes.
- * Condition nodes act as GATES (not branches) - they only pass through if condition is TRUE.
- * For if/else logic, TWO separate Condition nodes should be used with opposite conditions.
+ * Condition nodes support two valid patterns:
+ * 1. Single outgoing edge (gate): only passes through when condition is TRUE.
+ * 2. Two edges with sourceHandle "true" and "false" (if/else): routes to different paths.
+ *
+ * AVOID: parallel fan-out from a non-Condition node to two separate Condition nodes with
+ * opposite expressions. This causes a race condition — one branch always produces a dead end,
+ * leading to intermittent run errors.
  */
 function validateConditionNodes(
   nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined,
@@ -359,27 +364,39 @@ function validateConditionNodes(
     }
   }
 
-  // Count outgoing edges per Condition node
-  const outgoingEdgeCounts = new Map<string, number>();
+  // Collect outgoing edges per Condition node
+  const outgoingEdges = new Map<string, z.infer<typeof WorkflowEdgeSchema>[]>();
   for (const edge of edges) {
     if (conditionNodeIds.has(edge.source)) {
-      outgoingEdgeCounts.set(
-        edge.source,
-        (outgoingEdgeCounts.get(edge.source) ?? 0) + 1
-      );
+      if (!outgoingEdges.has(edge.source)) {
+        outgoingEdges.set(edge.source, []);
+      }
+      outgoingEdges.get(edge.source)!.push(edge);
     }
   }
 
-  // Warn if any Condition node has multiple outgoing edges
-  for (const [nodeId, count] of outgoingEdgeCounts) {
-    if (count > 1) {
-      warnings.push(
-        `WARNING: Condition node "${nodeId}" has ${count} outgoing edges. ` +
-        `Condition nodes act as GATES, not branches - they only pass through when TRUE. ` +
-        `For if/else logic, use TWO separate Condition nodes with opposite conditions ` +
-        `(e.g., "balance < 1" and "balance >= 1"), each connected to different actions.`
-      );
+  for (const [nodeId, nodeEdges] of outgoingEdges) {
+    if (nodeEdges.length <= 1) {
+      // Single outgoing edge — valid gate pattern
+      continue;
     }
+
+    if (nodeEdges.length === 2) {
+      const handles = nodeEdges.map((e) => e.sourceHandle);
+      if (handles.includes('true') && handles.includes('false')) {
+        // Valid if/else split — one true path, one false path
+        continue;
+      }
+    }
+
+    // Anything else is invalid
+    warnings.push(
+      `WARNING: Condition node "${nodeId}" has ${nodeEdges.length} outgoing edges without a valid true/false split. ` +
+      `Condition nodes support two patterns:\n` +
+      `  1. Single edge (gate) — passes through only when condition is TRUE\n` +
+      `  2. Two edges with sourceHandle "true" and "false" (if/else) — routes to separate paths\n` +
+      `Multiple edges without distinct true/false handles cause race conditions and intermittent run errors.`
+    );
   }
 
   return warnings;
@@ -633,7 +650,7 @@ export async function handleCreateWorkflow(
       content: [
         {
           type: 'text' as const,
-          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nPlease restructure using the correct if/else pattern with TWO Condition nodes.`,
+          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nUse a single Condition node with sourceHandle "true" → action-A and sourceHandle "false" → action-B for if/else logic.`,
         },
       ],
     };
@@ -700,7 +717,7 @@ export async function handleUpdateWorkflow(
       content: [
         {
           type: 'text' as const,
-          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nPlease restructure using the correct if/else pattern with TWO Condition nodes.`,
+          text: `ERROR: Invalid Condition node usage detected:\n${conditionWarnings.join('\n')}\n\nUse a single Condition node with sourceHandle "true" → action-A and sourceHandle "false" → action-B for if/else logic.`,
         },
       ],
     };
