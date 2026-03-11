@@ -60,14 +60,14 @@ env:
   MCP_API_KEY:
     type: parameterStore
     name: mcp-api-key
-    parameter_name: /eks/maker-staging/keeperhub-mcp/mcp-api-key
+    parameter_name: /eks/techops-staging/keeperhub-mcp/mcp-api-key
   KEEPERHUB_API_KEY:
     type: parameterStore
     name: keeperhub-api-key
-    parameter_name: /eks/maker-staging/keeperhub-mcp/keeperhub-api-key
+    parameter_name: /eks/techops-staging/keeperhub-mcp/keeperhub-api-key
 
 externalSecrets:
-  clusterSecretStoreName: maker-staging
+  clusterSecretStoreName: techops-staging
 
 livenessProbe:
   initialDelaySeconds: 5
