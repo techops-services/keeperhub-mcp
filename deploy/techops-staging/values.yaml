@@ -13,7 +13,7 @@ service:
 ingress:
   enabled: true
   hosts:
-    - mcp-staging.keeperhub.com
+    - mcp-staging-techops.keeperhub.com
   annotations:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
@@ -29,10 +29,7 @@ deployment:
   enabled: true
 
 serviceAccount:
-  create: true
-  annotations:
-    eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
-  name: keeperhub-mcp-staging
+  create: false
 
 podAnnotations:
   reloader.stakater.com/auto: "true"
@@ -56,7 +53,7 @@ env:
     value: "3000"
   KEEPERHUB_API_URL:
     type: kv
-    value: "http://keeperhub-staging-common.keeperhub:3000"
+    value: "http://keeperhub-common:3000"
   MCP_API_KEY:
     type: parameterStore
     name: mcp-api-key

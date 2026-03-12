@@ -96,6 +96,7 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
   },
   'web3/check-token-balance': {
     chainId: 'network',
+    tokenAddress: 'tokenConfig',
   },
   'web3/transfer-funds': {
     chainId: 'network',
@@ -106,18 +107,26 @@ const ACTION_FIELD_CORRECTIONS: Record<string, Record<string, string>> = {
     chainId: 'network',
     to: 'recipientAddress',
     toAddress: 'recipientAddress',
+    tokenAddress: 'tokenConfig',
   },
   'web3/read-contract': {
     chainId: 'network',
     contract: 'contractAddress',
-    function: 'functionName',
+    function: 'abiFunction',
+    functionName: 'abiFunction',
     args: 'functionArgs',
   },
   'web3/write-contract': {
     chainId: 'network',
     contract: 'contractAddress',
-    function: 'functionName',
+    function: 'abiFunction',
+    functionName: 'abiFunction',
     args: 'functionArgs',
+  },
+  // Database Query action
+  'Database Query': {
+    query: 'dbQuery',
+    schema: 'dbSchema',
   },
 };
 
@@ -413,18 +422,33 @@ function validateConditionNodes(
  */
 function ensureNodeDataFields(
   nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined
-): z.infer<typeof WorkflowNodeSchema>[] | undefined {
+): { nodes: z.infer<typeof WorkflowNodeSchema>[] | undefined; corrections: string[] } {
   if (!nodes) {
-    return undefined;
+    return { nodes: undefined, corrections: [] };
   }
 
-  return nodes.map((node) => {
+  const corrections: string[] = [];
+
+  const result = nodes.map((node) => {
     const data = node.data as Record<string, unknown>;
     const config = data.config as Record<string, unknown> | undefined;
     const label = data.label as string | undefined;
 
+    // Auto-correct node.type if it's not "trigger" or "action"
+    let correctedNodeType = node.type;
+    if (node.type !== 'trigger' && node.type !== 'action') {
+      if (config?.triggerType) {
+        correctedNodeType = 'trigger';
+      } else {
+        correctedNodeType = 'action';
+      }
+      corrections.push(
+        `Node "${node.id}": Corrected node.type from "${node.type}" to "${correctedNodeType}" (node.type must be "trigger" or "action")`
+      );
+    }
+
     // Determine node type from node.type field
-    const nodeType = node.type === 'trigger' ? 'trigger' : 'action';
+    const nodeType = correctedNodeType === 'trigger' ? 'trigger' : 'action';
 
     // Generate default description if missing
     let description = data.description as string | undefined;
@@ -457,8 +481,10 @@ function ensureNodeDataFields(
       }
     }
 
-    // Only update if fields are missing
+    // Only update if fields are missing or node.type needs correction
+    const needsNodeTypeCorrection = correctedNodeType !== node.type;
     const needsUpdate =
+      needsNodeTypeCorrection ||
       data.type !== nodeType ||
       data.status === undefined ||
       (data.description === undefined && description);
@@ -469,6 +495,7 @@ function ensureNodeDataFields(
 
     return {
       ...node,
+      ...(needsNodeTypeCorrection ? { type: correctedNodeType } : {}),
       data: {
         ...data,
         type: nodeType,
@@ -477,6 +504,8 @@ function ensureNodeDataFields(
       },
     };
   });
+
+  return { nodes: result, corrections };
 }
 
 /**
@@ -628,7 +657,8 @@ export async function handleCreateWorkflow(
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(args.nodes);
 
   // Ensure nodes have required UI fields (type, status, description)
-  const nodesWithUIFields = ensureNodeDataFields(normalizedNodes);
+  const { nodes: nodesWithUIFields, corrections: nodeTypeCorrections } = ensureNodeDataFields(normalizedNodes);
+  corrections.push(...nodeTypeCorrections);
 
   // Validate edges reference existing nodes
   const edgeWarnings = validateEdges(nodesWithUIFields, args.edges);
@@ -695,7 +725,8 @@ export async function handleUpdateWorkflow(
   const { nodes: normalizedNodes, corrections } = normalizeNodeConfigs(updateData.nodes);
 
   // Ensure nodes have required UI fields (type, status, description)
-  const nodesWithUIFields = ensureNodeDataFields(normalizedNodes);
+  const { nodes: nodesWithUIFields, corrections: nodeTypeCorrections } = ensureNodeDataFields(normalizedNodes);
+  corrections.push(...nodeTypeCorrections);
 
   // Validate edges reference existing nodes
   const edgeWarnings = validateEdges(nodesWithUIFields, updateData.edges);
