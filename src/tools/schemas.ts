@@ -86,10 +86,13 @@ export async function handleListActionSchemas(
     };
   }
 
-  // Default: return summary
+  // Default: return summary (include behavior for branching actions like Condition/For Each/Collect)
   const summary = {
     actions: Object.fromEntries(
-      Object.entries(schemas.actions).map(([k, v]) => [k, v.description])
+      Object.entries(schemas.actions).map(([k, v]) => [
+        k,
+        v.behavior ? `${v.description} | Behavior: ${v.behavior}` : v.description,
+      ])
     ),
     triggers: Object.fromEntries(
       Object.entries(schemas.triggers).map(([k, v]) => [k, v.description])

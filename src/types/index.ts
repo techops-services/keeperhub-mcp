@@ -220,6 +220,7 @@ export interface MCPActionSchema {
   optionalFields: Record<string, string>;
   outputFields?: Record<string, string>;
   behavior?: string;
+  sourceHandles?: string[];
 }
 
 export interface MCPTriggerSchema {
@@ -275,6 +276,7 @@ export interface MCPSchemasResponse {
     edgeStructure: Record<string, unknown>;
   };
   tips: string[];
+  builtinVariables?: Record<string, unknown>;
 }
 
 // Direct Execution API types
