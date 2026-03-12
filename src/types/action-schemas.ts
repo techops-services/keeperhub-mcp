@@ -6,6 +6,15 @@
  *
  * IMPORTANT: Field names must match exactly - the UI expects specific field names
  * and will not display values if the wrong field name is used.
+ *
+ * NODE STRUCTURE HIERARCHY:
+ *   node.type:              MUST be "trigger" or "action" (NOT the action type string)
+ *   data.type:              MUST match node.type
+ *   data.config.actionType: The specific action (e.g., "web3/read-contract", "Condition")
+ *   data.config.triggerType: The specific trigger (e.g., "Manual", "Schedule", "Event")
+ *
+ * Common mistake: setting node.type to "web3/read-contract" instead of "action".
+ * The MCP will auto-correct this, but always use "trigger" or "action" for node.type.
  */
 
 /**
@@ -15,6 +24,19 @@ export interface ConditionConfig {
   actionType: "Condition";
   /** The condition expression - MUST be "condition", NOT "conditionExpression" */
   condition: string; // e.g., "{{@nodeId:Label.balance}} < 0.5"
+  /** Optional structured condition config for complex rules */
+  conditionConfig?: {
+    group: {
+      id: string;
+      logic: "AND" | "OR";
+      rules: Array<{
+        id: string;
+        leftOperand: string;
+        operator: string;
+        rightOperand: string;
+      }>;
+    };
+  };
 }
 
 export interface HttpRequestConfig {
@@ -28,7 +50,10 @@ export interface HttpRequestConfig {
 export interface DatabaseQueryConfig {
   actionType: "Database Query";
   integrationId: string;
-  query: string;
+  /** The SQL query - MUST be "dbQuery", NOT "query" */
+  dbQuery: string;
+  /** Optional schema name */
+  dbSchema?: string;
 }
 
 /**
@@ -44,31 +69,43 @@ export interface CheckTokenBalanceConfig {
   actionType: "web3/check-token-balance";
   network: string;
   address: string;
-  tokenAddress: string;
+  /** Token config - MUST be "tokenConfig", NOT "tokenAddress". JSON string format: {"mode":"custom","customToken":{"address":"0x...","symbol":"USDC"}} */
+  tokenConfig: string;
 }
 
 export interface TransferFundsConfig {
   actionType: "web3/transfer-funds";
   network: string;
-  toAddress: string;
+  /** Recipient address - MUST be "recipientAddress", NOT "toAddress" */
+  recipientAddress: string;
   amount: string;
   walletId: string;
+  gasLimitMultiplier?: string;
 }
 
 export interface TransferTokenConfig {
   actionType: "web3/transfer-token";
   network: string;
-  toAddress: string;
-  tokenAddress: string;
+  /** Recipient address - MUST be "recipientAddress", NOT "toAddress" */
+  recipientAddress: string;
+  /** Token config - MUST be "tokenConfig", NOT "tokenAddress". JSON string format: {"mode":"custom","customToken":{"address":"0x...","symbol":"USDC"}} */
+  tokenConfig: string;
   amount: string;
   walletId: string;
+  gasLimitMultiplier?: string;
 }
 
+/**
+ * Read contract config.
+ * NOTE: The `result` output may be a string OR an array for multi-output functions
+ * (e.g., ["353846984796182301"]). Avoid wrapping in Number() without checking type first.
+ */
 export interface ReadContractConfig {
   actionType: "web3/read-contract";
   network: string;
   contractAddress: string;
-  functionName: string;
+  /** ABI function selector - MUST be "abiFunction", NOT "functionName" */
+  abiFunction: string;
   functionArgs?: string; // JSON array string
   abi?: string; // JSON string
 }
@@ -77,7 +114,8 @@ export interface WriteContractConfig {
   actionType: "web3/write-contract";
   network: string;
   contractAddress: string;
-  functionName: string;
+  /** ABI function selector - MUST be "abiFunction", NOT "functionName" */
+  abiFunction: string;
   functionArgs?: string;
   abi?: string;
   walletId: string;
@@ -148,6 +186,21 @@ export interface EventTriggerConfig {
 /**
  * Union types for convenience
  */
+/**
+ * Code Plugin Actions
+ */
+export interface RunCodeConfig {
+  actionType: "code/run-code";
+  /** JavaScript code to execute */
+  code: string;
+  /** Execution timeout in milliseconds */
+  timeout?: number;
+  /**
+   * Output fields: success (boolean), result (any), logs (string), error (string), line (number).
+   * Downstream templates reference output via: {{@nodeId:Label.result}} or {{@nodeId:Label.result.yourField}}
+   */
+}
+
 export type ActionConfig =
   | ConditionConfig
   | HttpRequestConfig
@@ -160,7 +213,8 @@ export type ActionConfig =
   | WriteContractConfig
   | SendWebhookConfig
   | SendDiscordMessageConfig
-  | SendEmailConfig;
+  | SendEmailConfig
+  | RunCodeConfig;
 
 export type TriggerConfig =
   | ManualTriggerConfig
@@ -181,6 +235,10 @@ export type TriggerConfig =
  * message              ->  discordMessage (for Discord)
  * to/subject/body      ->  emailTo/emailSubject/emailBody (for SendGrid)
  * chainId              ->  network (use string, not number)
+ * query                ->  dbQuery (for Database Query)
+ * toAddress            ->  recipientAddress (for transfer-funds and transfer-token)
+ * tokenAddress         ->  tokenConfig (for check-token-balance and transfer-token)
+ * functionName         ->  abiFunction (for read-contract and write-contract)
  *
  * TRIGGER FIELD NAMES (these are critical!):
  * WRONG                    CORRECT
@@ -212,17 +270,24 @@ export type TriggerConfig =
  */
 
 /**
- * Edge structure - IMPORTANT: Do NOT use sourceHandle or targetHandle
+ * Edge structure - sourceHandle rules:
  *
- * KeeperHub nodes use simple handles without IDs. Using sourceHandle
- * or targetHandle will cause edges to not render.
+ * sourceHandle IS REQUIRED for Condition (if/else) and For Each nodes:
+ *   - Condition nodes: use sourceHandle "true" or "false" to route if/else branches
+ *   - For Each nodes: use sourceHandle "loop" (iteration body) or "done" (after completion)
+ *
+ * sourceHandle should be OMITTED for all other node types (simple sequential edges).
  *
  * ```typescript
- * const edge = {
- *   id: "edge-1",
- *   source: "node-1",
- *   target: "node-2",
- *   // Do NOT include: sourceHandle, targetHandle
- * };
+ * // Simple edge (non-branching nodes):
+ * const simpleEdge = { id: "e1", source: "node-1", target: "node-2" };
+ *
+ * // Condition true/false edges:
+ * const trueEdge = { id: "e2", source: "condition-1", target: "action-a", sourceHandle: "true" };
+ * const falseEdge = { id: "e3", source: "condition-1", target: "action-b", sourceHandle: "false" };
+ *
+ * // For Each loop/done edges:
+ * const loopEdge = { id: "e4", source: "foreach-1", target: "loop-body", sourceHandle: "loop" };
+ * const doneEdge = { id: "e5", source: "foreach-1", target: "after-loop", sourceHandle: "done" };
  * ```
  */
