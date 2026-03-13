@@ -23,7 +23,7 @@ jobs:
       ENVIRONMENT_TAG: ${{ github.ref == 'refs/heads/main' && 'prod' || 'staging' }}
       NAMESPACE: keeperhub
       SERVICE_NAME: keeperhub-mcp
-      AWS_ECR_NAME: ${{ github.ref == 'refs/heads/main' && 'keeperhub-mcp' || 'keeperhub-mcp-staging' }}
+      AWS_ECR_NAME: ${{ github.ref == 'refs/heads/main' && 'keeperhub-mcp-prod' || 'keeperhub-mcp-staging' }}
       SERVICE_ACCOUNT_ROLE_ARN: ${{ vars.SERVICE_ACCOUNT_ROLE_ARN }}
       TO_REGION: ${{ github.ref == 'refs/heads/main' && 'us-east-2' || 'us-east-1' }}
       TO_CLUSTER_NAME: ${{ github.ref == 'refs/heads/main' && 'techops-prod' || 'techops-staging' }}

@@ -13,7 +13,7 @@ service:
 ingress:
   enabled: true
   hosts:
-    - mcp.keeperhub.com
+    - mcp-techops.keeperhub.com
   annotations:
     external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
@@ -29,10 +29,7 @@ deployment:
   enabled: true
 
 serviceAccount:
-  create: true
-  annotations:
-    eks.amazonaws.com/role-arn: ${SERVICE_ACCOUNT_ROLE_ARN}
-  name: keeperhub-mcp-prod
+  create: false
 
 podAnnotations:
   reloader.stakater.com/auto: "true"
@@ -56,18 +53,18 @@ env:
     value: "3000"
   KEEPERHUB_API_URL:
     type: kv
-    value: "http://keeperhub-prod-common.keeperhub:3000"
+    value: "http://keeperhub-common:3000"
   MCP_API_KEY:
     type: parameterStore
     name: mcp-api-key
-    parameter_name: /eks/maker-prod/keeperhub-mcp/mcp-api-key
+    parameter_name: /eks/techops-prod/keeperhub-mcp/mcp-api-key
   KEEPERHUB_API_KEY:
     type: parameterStore
     name: keeperhub-api-key
-    parameter_name: /eks/maker-prod/keeperhub-mcp/keeperhub-api-key
+    parameter_name: /eks/techops-prod/keeperhub-mcp/keeperhub-api-key
 
 externalSecrets:
-  clusterSecretStoreName: maker-prod
+  clusterSecretStoreName: techops-prod
 
 livenessProbe:
   initialDelaySeconds: 5
