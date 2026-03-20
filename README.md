@@ -487,5 +487,5 @@ MIT
 ## Support
 
 For issues or questions:
-- GitHub Issues: [techops-services/keeperhub-mcp](https://github.com/techops-services/keeperhub-mcp/issues)
+- GitHub Issues: [KeeperHub/keeperhub-mcp](https://github.com/KeeperHub/keeperhub-mcp/issues)
 - Documentation: [KeeperHub Docs](https://docs.keeperhub.com)

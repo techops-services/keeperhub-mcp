@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the KeeperHub MCP Server!
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/techops-services/keeperhub-mcp.git
+git clone https://github.com/KeeperHub/keeperhub-mcp.git
 cd keeperhub-mcp
 ```
 
